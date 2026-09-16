@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>io.vidocq.tools</groupId>
+    <artifactId>lc4jcdi-on-vidocq-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+
+    <name>LangChain4j CDI on Vidocq</name>
+    <description>Examples showing dev.langchain4j.cdi (LangChain4j CDI) components hosted on the Vidocq runtime
+        suite (Vauban CDI 4.1 Lite + Cassini Jakarta REST + Chappe HTTP).</description>
+    <url>https://codefloe.com/VidocqTools/LC4JCDI-on-vidocq</url>
+
+    <modules>
+        <module>mcp-time-server</module>
+    </modules>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+
+        <maven.compiler.release>25</maven.compiler.release>
+
+        <!--
+            langchain4j-cdi-mcp is pinned to this exact SNAPSHOT because it is the first version whose MCP
+            server exports its application-facing packages (…server.api, …server.protocol, …server.transport)
+            and carries the MCP 2026-07-28 (tool annotations, resource templates, MRTR) support that these
+            examples exercise. Move this property to a released version once langchain4j-cdi publishes one that
+            contains the MCP 2026-07-28 work (tracked upstream; no release exists yet as of 2026-09).
+        -->
+        <lc4jcdi.version>1.4.0-SNAPSHOT</lc4jcdi.version>
+        <vidocq.version>0.3.0</vidocq.version>
+
+        <junit.version>5.11.4</junit.version>
+    </properties>
+
+    <repositories>
+        <repository>
+            <id>central-snapshots</id>
+            <name>Central Portal Snapshots</name>
+            <url>https://central.sonatype.com/repository/maven-snapshots/</url>
+            <releases>
+                <enabled>false</enabled>
+            </releases>
+            <snapshots>
+                <enabled>true</enabled>
+            </snapshots>
+        </repository>
+    </repositories>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.junit</groupId>
+                <artifactId>junit-bom</artifactId>
+                <version>${junit.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <!--
+                        3.14.0 post-processes the compiled module-info.class with ASM 9.7, which cannot read a
+                        Java 25 class file (major 69) and fails the build AFTER a successful compilation.
+                        3.16.0 ships an ASM that can.
+                    -->
+                    <version>3.16.0</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-surefire-plugin</artifactId>
+                    <version>3.5.2</version>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+                <version>3.5.0</version>
+                <executions>
+                    <execution>
+                        <id>require-java-25</id>
+                        <goals>
+                            <goal>enforce</goal>
+                        </goals>
+                        <configuration>
+                            <rules>
+                                <requireJavaVersion>
+                                    <version>[25,)</version>
+                                    <message>Vidocq 0.3.0 ships Java 25 class files (class file major version 69) and its Maven plugin and runtime both refuse to start on an older JDK. Building this repository requires JDK 25+: point JAVA_HOME at a JDK 25 install (for example "sdk use java 25-tem") and re-run.</message>
+                                </requireJavaVersion>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>
