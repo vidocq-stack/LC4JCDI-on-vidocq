@@ -60,11 +60,24 @@ bean index (`META-INF/vauban-beans.list`) and client proxies into `target/classe
 rebuilds `target/classes` without running any Maven goal, which wipes the index: Cassini then has no resource to
 route, hence the 404.
 
-Fix, either:
+What the IDE build already does, and what it cannot: the Vauban **annotation processor** runs inside the IDE's
+compiler and indexes this module's own beans. Only `vidocq:generate` indexes beans that live in a *dependency*
+jar — and `McpEndpoint` is one. Fix, from most to least comfortable:
 
-- **IntelliJ:** *Settings → Build, Execution, Deployment → Build Tools → Maven → Runner → Delegate IDE build/run
-  actions to Maven*, then rebuild and restart the run configuration; or
-- run `mvn process-classes` before each launch, and make sure the IDE does not rebuild the module afterwards.
+- **IntelliJ, keeping its own fast build:** in the *Maven* tool window, open *mcp-time-server → Plugins → vidocq*,
+  right-click **`vidocq:generate`** and choose **Execute After Build** (and **Execute After Rebuild**). IntelliJ then
+  compiles as usual and runs only that goal afterwards. This works because `scanDependencies` is configured at
+  plugin level in `mcp-time-server/pom.xml`: a goal run on its own uses Maven's `default-cli` execution, which
+  would not inherit a configuration placed on the `generate` execution, and would silently index nothing.
+- **IntelliJ, delegating everything:** *Settings → Build, Execution, Deployment → Build Tools → Maven → Runner →
+  Delegate IDE build/run actions to Maven*, then rebuild. Slower, but no hook to maintain.
+- **Any IDE:** run `mvn process-classes` before each launch, and make sure the IDE does not rebuild the module
+  afterwards.
+
+Whichever you pick, after a rebuild `mcp-time-server/target/classes/META-INF/vauban-beans.list` must exist and
+contain `McpEndpoint`. The gap is tracked upstream in
+[Vidocq/vidocq#83](https://codefloe.com/Vidocq/vidocq/issues/83), which also proposes letting the annotation
+processor index dependency modules so that no Maven goal is needed at all.
 
 Launched this way — every jar on one flat module path — the class-loader workaround described below is not
 needed: the MCP API and its provider share the boot layer. Use JDK 25 or newer for the run configuration.

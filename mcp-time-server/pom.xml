@@ -188,22 +188,26 @@
                 <groupId>io.vidocq.runtime</groupId>
                 <artifactId>vidocq-runtime-maven-plugin</artifactId>
                 <version>${vidocq.version}</version>
+                <!--
+                    McpEndpoint and the whole MCP server live in a dependency jar that Vauban's APT never saw, so its
+                    CDI beans have to be indexed (and client-proxied) at build time from the outside.
+
+                    Deliberately at plugin level, not on the "generate" execution: a goal run on its own
+                    (`mvn vidocq:generate`, or IntelliJ's "Execute After Build" hook) uses the default-cli
+                    execution, which does not inherit an execution's configuration. It then logs "No dependencies
+                    to process" and indexes nothing — measured. See https://codefloe.com/Vidocq/vidocq/issues/83
+                -->
+                <configuration>
+                    <scanDependencies>
+                        <scanDependency>dev.langchain4j.cdi.mcp:langchain4j-cdi-mcp-server</scanDependency>
+                    </scanDependencies>
+                </configuration>
                 <executions>
                     <execution>
                         <id>generate</id>
                         <goals>
                             <goal>generate</goal>
                         </goals>
-                        <configuration>
-                            <!--
-                                McpEndpoint and the whole MCP server live in a dependency jar that Vauban's APT
-                                never saw, so its CDI beans have to be indexed (and client-proxied) at build
-                                time from the outside.
-                            -->
-                            <scanDependencies>
-                                <scanDependency>dev.langchain4j.cdi.mcp:langchain4j-cdi-mcp-server</scanDependency>
-                            </scanDependencies>
-                        </configuration>
                     </execution>
                     <execution>
                         <id>package</id>
