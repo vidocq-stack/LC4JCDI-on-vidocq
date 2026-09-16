@@ -1,0 +1,120 @@
+# LangChain4j CDI on Vidocq
+
+Example applications that host [langchain4j-cdi](https://github.com/langchain4j/langchain4j-cdi) on the
+[Vidocq](https://repo1.maven.org/maven2/io/vidocq/) runtime suite — **Vauban** (CDI 4.1 Lite, build-time bean
+index, no reflection-based discovery), **Cassini** (Jakarta RESTful Web Services 4.0) and **Chappe** (HTTP).
+
+This repository will grow to host several langchain4j-cdi examples on Vidocq over time. Today it has one:
+
+| Module | What it shows |
+|---|---|
+| [`mcp-time-server`](mcp-time-server) | langchain4j-cdi's **MCP server** (tools, a resource template, a prompt) running on Vidocq, including reflection-free method invocation via `langchain4j-cdi-mcp-invoker-cdi41` |
+
+## Prerequisites
+
+- **JDK 25.** Vidocq 0.3.0 ships Java 25 class files (class file major version 69); its Maven plugin and runtime
+  both refuse to run on an older JDK. Point `JAVA_HOME` at a JDK 25 install for every Maven and `java` command
+  below, e.g. `JAVA_HOME=$(sdk home java 25-tem)`.
+- **Maven** (plain `mvn` — this repository has no Maven wrapper and does not want one).
+- **Node.js** (for `npx`, used only by `test-mcp.sh` to run the MCP Inspector CLI).
+
+## Build
+
+```bash
+export JAVA_HOME=/path/to/jdk-25
+mvn -B clean verify
+```
+
+This compiles every module, runs the unit tests (plain JUnit, no container), and produces a runnable
+distribution for `mcp-time-server` under `mcp-time-server/target/mcp-time-server-<version>/`.
+
+On an older JDK, the build fails fast with a clear sentence instead of the compiler's opaque
+`release version 25 not supported`, thanks to a `maven-enforcer-plugin` `requireJavaVersion` rule in the root
+POM:
+
+```
+[ERROR] Vidocq 0.3.0 ships Java 25 class files (class file major version 69) and its Maven plugin and runtime
+both refuse to start on an older JDK. Building this repository requires JDK 25+: point JAVA_HOME at a JDK 25
+install (for example "sdk use java 25-tem") and re-run.
+```
+
+## Run
+
+```bash
+cd mcp-time-server
+JAVA_HOME=/path/to/jdk-25 ./run.sh
+```
+
+The MCP endpoint is served at `http://localhost:8080/mcp`. Do not use the generated
+`target/<dist>/bin/mcp-time-server.sh` launcher directly — see "Workarounds" below for why `run.sh` exists.
+
+## Test end to end
+
+```bash
+./test-mcp.sh --start
+```
+
+Drives the running server with a real MCP client — the
+[MCP Inspector CLI](https://www.npmjs.com/package/@modelcontextprotocol/inspector) (`npx -y
+@modelcontextprotocol/inspector`, currently 2.6.0) — over `tools/list`, `tools/call`, `resources/templates/list`,
+`resources/read` and `prompts/get`, asserting on response content (not just exit codes). `--start` builds
+nothing; it starts the already-built server via `mcp-time-server/run.sh`, waits for the endpoint to answer, runs
+every check, and always stops the server on exit, pass or fail. Without `--start`, point it at a server you
+started yourself:
+
+```bash
+MCP_URL=http://localhost:8080/mcp ./test-mcp.sh
+```
+
+## The `1.4.0-SNAPSHOT` dependency
+
+`langchain4j-cdi-mcp-server` and `langchain4j-cdi-mcp-invoker-cdi41` are pinned, in one place
+(`lc4jcdi.version` in the root POM), to `dev.langchain4j.cdi.mcp:*:1.4.0-SNAPSHOT` — **not** the `1.4.0` release.
+The release predates the MCP `2026-07-28` protocol support (tool annotations, resource templates, MRTR) these
+examples exercise, even though its version string sorts higher than the snapshot's. The snapshot is resolved
+from `https://central.sonatype.com/repository/maven-snapshots/`, declared in the root POM with snapshots
+enabled and releases disabled. Move `lc4jcdi.version` to a release coordinate once langchain4j-cdi publishes one
+that contains the MCP `2026-07-28` work.
+
+## Workarounds
+
+Three host-level workarounds were needed to run langchain4j-cdi's MCP server on Vidocq 0.3.0. None touch MCP
+server production code.
+
+1. **`-Avauban.validation=false`** on the compiler (`mcp-time-server/pom.xml`). Vauban's build-time bean index
+   is built from the packages a *scanned dependency* exports; the cross-module index that actually resolves
+   beans living inside `langchain4j-cdi-mcp-server.jar` (the tool/prompt/resource registries and their
+   `transport`-package collaborators) is only produced later, by `vidocq:generate` (`process-classes`).
+   Bean-resolution validation is therefore deferred to the runtime container, where it succeeds — Vauban's own
+   build warning suggests this exact flag.
+2. ~~Three `--add-exports` compiler flags~~ — **not needed.** An earlier measurement against langchain4j-cdi's
+   MCP server found that its module descriptor exported only `…server.registry`, so no module-path consumer
+   could compile against `…server.api`, `…server.protocol` or `…server.transport` without `--add-exports`.
+   `1.4.0-SNAPSHOT` now exports all three packages, so this module needs none of them.
+3. **`run.sh` moves `langchain4j-cdi-mcp-server`, `mcp-server-api` and `langchain4j-cdi-mcp-invoker-cdi41` from
+   `lib/` into `app/` before starting the server.** This one is required. `vidocq:package` puts only the
+   application jar in `app/`, and Vidocq re-layers only that jar into the Vauban child layer.
+   `org.mcpjava.server.spi.McpServerSPILoader` resolves its provider with
+   `ServiceLoader.load(McpServerSPI.class, McpServerSPILoader.class.getClassLoader())` — the class loader of
+   `mcp-server-api`, which stays in the **boot** layer — so it cannot see the provider
+   (`dev.langchain4j.cdi.mcp.server.spi.CdiMcpServerSPI`) that lives in the **child** layer. Every tool, prompt
+   and resource invocation then fails with `No McpServerSPI implementation found`. Reported upstream as
+   [mcp-java/java-mcp-annotations#71](https://github.com/mcp-java/java-mcp-annotations/issues/71). The fix is
+   pure packaging: move the three jars into `app/` and boot through the universal loader
+   (`-Dvidocq.app.path=app`), so the service interface and its provider share one layer. `langchain4j-cdi-mcp-invoker-cdi41`
+   is moved for the analogous reason: Vauban discovers its build-compatible extension via `ServiceLoader` inside
+   the application layer, and the synthetic bean it registers must implement the `McpInvokerProvider` interface
+   that the app-layer MCP server injects — left in `lib/` (the boot layer), the extension is invisible and every
+   MCP method silently falls back to reflection.
+
+## Examples
+
+### `mcp-time-server`
+
+Four small, self-contained examples of the MCP server's feature surface, all about IANA time zones — see
+[`mcp-time-server/README.md`](mcp-time-server/README.md).
+
+## Pending owner decisions
+
+- **License.** No `LICENSE` file is included; that choice is left to the repository owner.
+- **CI.** No CI workflow is configured yet.
