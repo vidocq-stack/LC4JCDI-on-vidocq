@@ -47,6 +47,27 @@ JAVA_HOME=/path/to/jdk-25 ./run.sh
 
 The MCP endpoint is served at `http://localhost:8080/mcp`. Do not use the generated
 `target/<dist>/bin/mcp-time-server.sh` launcher directly — see "Workarounds" below for why `run.sh` exists.
+Another port: `JAVA_OPTS="-Dvidocq.chappe.listener.default.port=8081" ./run.sh`.
+
+## Running from an IDE
+
+Launching `McpTimeServerApp` straight from IntelliJ (or any IDE) works, **provided the IDE build runs Maven's
+lifecycle**. Otherwise the server starts, listens on 8080, and answers **404 to everything, `/mcp` included**.
+
+Why: Vauban discovers beans at build time. The `vidocq:generate` goal (bound to `process-classes`) writes the
+bean index (`META-INF/vauban-beans.list`) and client proxies into `target/classes`, and it scans the
+`langchain4j-cdi-mcp-server` dependency so that `McpEndpoint` is part of that index. An IDE's own compiler
+rebuilds `target/classes` without running any Maven goal, which wipes the index: Cassini then has no resource to
+route, hence the 404.
+
+Fix, either:
+
+- **IntelliJ:** *Settings → Build, Execution, Deployment → Build Tools → Maven → Runner → Delegate IDE build/run
+  actions to Maven*, then rebuild and restart the run configuration; or
+- run `mvn process-classes` before each launch, and make sure the IDE does not rebuild the module afterwards.
+
+Launched this way — every jar on one flat module path — the class-loader workaround described below is not
+needed: the MCP API and its provider share the boot layer. Use JDK 25 or newer for the run configuration.
 
 ## Test end to end
 
@@ -59,8 +80,16 @@ Drives the running server with a real MCP client — the
 @modelcontextprotocol/inspector`, currently 2.6.0) — over `tools/list`, `tools/call`, `resources/templates/list`,
 `resources/read` and `prompts/get`, asserting on response content (not just exit codes). `--start` builds
 nothing; it starts the already-built server via `mcp-time-server/run.sh`, waits for the endpoint to answer, runs
-every check, and always stops the server on exit, pass or fail. Without `--start`, point it at a server you
-started yourself:
+every check, and always stops the server on exit, pass or fail. `--start` listens on the port of `MCP_URL` and
+refuses to start if that port is already taken — so it can run next to a server you already have on 8080:
+
+```bash
+MCP_URL=http://localhost:8081/mcp ./test-mcp.sh --start
+```
+
+Without `--start`, it tests a server you started yourself (from `run.sh` or an IDE). A pre-flight MCP request
+runs first, and reports a missing or broken endpoint once — with its likely cause — rather than failing every
+check:
 
 ```bash
 MCP_URL=http://localhost:8080/mcp ./test-mcp.sh

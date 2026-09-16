@@ -21,11 +21,12 @@
 #   in lib/ (the boot layer) the extension is never seen and every MCP method silently keeps using reflection.
 #
 # Usage:  ./run.sh [&]     (JAVA_HOME must point at a JDK 25+)
+#         JAVA_OPTS="-Dvidocq.chappe.listener.default.port=8081" ./run.sh     (another port)
 set -e
 BASE=$(cd "$(dirname "$0")" && pwd)
 DIST=$(ls -d "$BASE"/target/mcp-time-server-*/ 2>/dev/null | head -1)
 if [ -z "$DIST" ]; then
-    echo "No distribution found. Run: mvn -Pvidocq package -pl mcp-time-server" >&2
+    echo "No distribution found. Run 'mvn package' from the repository root first." >&2
     exit 1
 fi
 DIST=${DIST%/}
@@ -37,4 +38,5 @@ exec "${JAVA_HOME:-/usr}/bin/java" \
     --module-path "$DIST/lib" \
     --add-modules ALL-MODULE-PATH \
     -Dvidocq.app.path="$DIST/app" \
+    ${JAVA_OPTS:-} \
     -m io.vidocq.runtime.core/io.vidocq.runtime.core.Vidocq "$@"
