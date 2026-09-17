@@ -204,9 +204,10 @@
                     CDI beans have to be indexed (and client-proxied) at build time from the outside.
 
                     Deliberately at plugin level, not on the "generate" execution: a goal run on its own
-                    (`mvn vidocq:generate`, or IntelliJ's "Execute After Build" hook) uses the default-cli
-                    execution, which does not inherit an execution's configuration. It then logs "No dependencies
-                    to process" and indexes nothing — measured. See https://codefloe.com/Vidocq/vidocq/issues/83
+                    (`mvn vidocq:generate`, or the "Before launch" step of .run/McpTimeServerApp.run.xml) uses the
+                    default-cli execution, which does not inherit an execution's configuration. It then logs "No
+                    dependencies to process" and indexes nothing — measured. See
+                    https://codefloe.com/Vidocq/vidocq/issues/83
                 -->
                 <configuration>
                     <scanDependencies>

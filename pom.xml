@@ -22,6 +22,12 @@
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
         <maven.compiler.release>25</maven.compiler.release>
+        <!--
+            Eclipse (m2e-apt): run the processors of each module's <annotationProcessorPaths>, with their -A options,
+            inside JDT's own compiler, as javac runs them under Maven. m2e-apt reads this property from the effective
+            POM, so it covers every module. See README.md, "Running from an IDE".
+        -->
+        <m2e.apt.activation>jdt_apt</m2e.apt.activation>
 
         <!--
             langchain4j-cdi-mcp is pinned to this exact SNAPSHOT because it is the first version whose MCP

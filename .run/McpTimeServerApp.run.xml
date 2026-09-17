@@ -1,0 +1,12 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="McpTimeServerApp" type="Application" factoryName="Application">
+    <option name="ALTERNATIVE_JRE_PATH" value="temurin-25" />
+    <option name="ALTERNATIVE_JRE_PATH_ENABLED" value="true" />
+    <option name="MAIN_CLASS_NAME" value="io.vidocq.tools.lc4jcdi.mcptimeserver.McpTimeServerApp" />
+    <module name="mcp-time-server" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+      <option name="Maven.BeforeRunTask" enabled="true" file="$PROJECT_DIR$/mcp-time-server/pom.xml" goal="vidocq:generate" />
+    </method>
+  </configuration>
+</component>

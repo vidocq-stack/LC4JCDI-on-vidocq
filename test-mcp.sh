@@ -60,11 +60,12 @@ explain_probe_failure() {
             ;;
         404)
             echo "FAIL: a server answers at $MCP_URL but exposes no MCP endpoint there (HTTP 404)." >&2
-            echo "      Most likely it runs from classes compiled by an IDE. IDE builds skip the vidocq:generate" >&2
-            echo "      goal, so the Vauban bean index never learns about McpEndpoint and no route is registered." >&2
-            echo "      Fix: run 'mvn process-classes' then restart it, or in IntelliJ enable" >&2
-            echo "      Settings > Build, Execution, Deployment > Build Tools > Maven > Runner >" >&2
-            echo "      'Delegate IDE build/run actions to Maven'. See README.md, 'Running from an IDE'." >&2
+            echo "      Most likely it runs from classes an IDE compiled without the vidocq:generate goal, so the" >&2
+            echo "      Vauban bean index never learns about McpEndpoint and no route is registered." >&2
+            echo "      Fix: in IntelliJ, launch the shared 'McpTimeServerApp' run configuration (.run/), whose" >&2
+            echo "      'Before launch' step runs vidocq:generate, or delegate IDE build/run actions to Maven" >&2
+            echo "      (Settings > Build, Execution, Deployment > Build Tools > Maven > Runner). Elsewhere, run" >&2
+            echo "      'mvn process-classes' and restart the server. See README.md, 'Running from an IDE'." >&2
             ;;
         *)
             echo "FAIL: $MCP_URL answered HTTP $1 to an MCP initialize request." >&2

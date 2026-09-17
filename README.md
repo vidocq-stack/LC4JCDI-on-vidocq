@@ -51,36 +51,129 @@ Another port: `JAVA_OPTS="-Dvidocq.chappe.listener.default.port=8081" ./run.sh`.
 
 ## Running from an IDE
 
-Launching `McpTimeServerApp` straight from IntelliJ (or any IDE) works, **provided the IDE build runs Maven's
-lifecycle**. Otherwise the server starts, listens on 8080, and answers **404 to everything, `/mcp` included**.
+An IDE starts `McpTimeServerApp` from its own build output, `mcp-time-server/target/classes`, with the dependency
+jars on one flat module path. Two things must already be in that output, or the server starts, listens, and
+answers **404 to everything, `/mcp` included**:
 
-Why: Vauban discovers beans at build time. The `vidocq:generate` goal (bound to `process-classes`) writes the
-bean index (`META-INF/vauban-beans.list`) and client proxies into `target/classes`, and it scans the
-`langchain4j-cdi-mcp-server` dependency so that `McpEndpoint` is part of that index. An IDE's own compiler
-rebuilds `target/classes` without running any Maven goal, which wipes the index: Cassini then has no resource to
-route, hence the 404.
+- this module's bean index and client proxies, which the Vauban and Cassini **annotation processors** write while
+  the module compiles;
+- the beans of the `langchain4j-cdi-mcp-server` **dependency jar**, `McpEndpoint` among them, which only the
+  `vidocq:generate` goal indexes. Maven runs that goal at `process-classes`; an IDE's own build never does.
 
-What the IDE build already does, and what it cannot: the Vauban **annotation processor** runs inside the IDE's
-compiler and indexes this module's own beans. Only `vidocq:generate` indexes beans that live in a *dependency*
-jar — and `McpEndpoint` is one. Fix, from most to least comfortable:
+To check a launch, look for `McpEndpoint` in `mcp-time-server/target/classes/META-INF/vauban-beans.list` and for
+`Application layer ready: modules [...]` in the server log. Even then, two examples fail when launched from an IDE:
+see "Known limitation" at the end of this section.
 
-- **IntelliJ, keeping its own fast build:** in the *Maven* tool window, open *mcp-time-server → Plugins → vidocq*,
-  right-click **`vidocq:generate`** and choose **Execute After Build** (and **Execute After Rebuild**). IntelliJ then
-  compiles as usual and runs only that goal afterwards. This works because `scanDependencies` is configured at
-  plugin level in `mcp-time-server/pom.xml`: a goal run on its own uses Maven's `default-cli` execution, which
-  would not inherit a configuration placed on the `generate` execution, and would silently index nothing.
-- **IntelliJ, delegating everything:** *Settings → Build, Execution, Deployment → Build Tools → Maven → Runner →
-  Delegate IDE build/run actions to Maven*, then rebuild. Slower, but no hook to maintain.
-- **Any IDE:** run `mvn process-classes` before each launch, and make sure the IDE does not rebuild the module
-  afterwards.
+### IntelliJ IDEA
 
-Whichever you pick, after a rebuild `mcp-time-server/target/classes/META-INF/vauban-beans.list` must exist and
-contain `McpEndpoint`. The gap is tracked upstream in
-[Vidocq/vidocq#83](https://codefloe.com/Vidocq/vidocq/issues/83), which also proposes letting the annotation
-processor index dependency modules so that no Maven goal is needed at all.
+Open the repository as a Maven project, then run or debug the shared **`McpTimeServerApp`** configuration. It is
+stored in `.run/McpTimeServerApp.run.xml`, and IntelliJ loads it by itself. It does three things:
 
-Launched this way — every jar on one flat module path — the class-loader workaround described below is not
-needed: the MCP API and its provider share the boot layer. Use JDK 25 or newer for the run configuration.
+1. **JDK.** It runs on the JDK that IntelliJ lists as `temurin-25`, the name IntelliJ gives an Eclipse Temurin 25
+   that it downloads or detects (`.sdkmanrc` asks for `25-tem`). If your JDK 25 has another name, IntelliJ reports
+   that it cannot find `temurin-25` and offers to look for one. You can also select your JDK 25 or newer in the
+   configuration's JRE field.
+2. **Build.** IntelliJ compiles the module. For that build to run the annotation processors, IntelliJ's Maven import
+   must resolve every entry of `annotationProcessorPaths` as a jar, which is why `mcp-time-server/pom.xml` names the
+   processor jars. With the `vidocq-runtime-*-codegen` POM aggregates used before, that resolution failed, and
+   IntelliJ compiled without any processor.
+3. **`vidocq:generate`.** A *Before launch* Maven step runs this goal alone on `mcp-time-server/pom.xml`. The goal
+   indexes the MCP server jar. It also repairs this module's own bean index: an incremental build recompiles only
+   the files you changed, and the annotation processor can then rewrite `META-INF/vauban-beans.list` with the beans
+   of those files only. Measured from the command line, the goal alone takes under a second (0.74 to 0.76 s), and
+   an index cut down to one entry is back to its 31 entries afterwards. The goal can run alone because
+   `scanDependencies` is configured at plugin level in `mcp-time-server/pom.xml`.
+
+Things to know:
+
+- **Maven runner JDK.** The *Before launch* goal runs on the JRE set in *Settings → Build, Execution, Deployment →
+  Build Tools → Maven → Runner* (the project JDK by default). It must be 25 or newer.
+- **Gutter icon.** The run icon next to `main` reuses the existing configuration for this class. If the
+  `McpTimeServerApp` configuration you see has no `vidocq:generate` step under *Before launch*, it is a temporary
+  configuration that IntelliJ created from an earlier click. Delete it and reopen the project, and IntelliJ loads
+  the shared configuration again.
+- **Build without Run.** *Build Project* or *Rebuild Project* on its own can leave the bean index incomplete until
+  the next launch through this configuration.
+- **Renamed or deleted beans** stay in the bean index, because the goal only adds entries. *Rebuild Project* or
+  `mvn clean`, followed by a launch, removes them.
+- **Editing a `pom.xml`** needs *Sync Maven Changes*: the goal does not update IntelliJ's libraries.
+- **Debug and HotSwap.** `vidocq:generate` also adds a constructor taking a `ProxyLink` to this module's
+  normal-scoped beans, directly in `target/classes`. When you reload an edited bean class during a Debug session,
+  IntelliJ probably compiles it without that constructor. The JVM then refuses the redefinition, because it would
+  remove a method (`delete method not implemented`). This was measured through JDI with a class that lost such a
+  constructor, and has not been observed in IntelliJ yet. Restart the Debug session instead: the restart runs the
+  *Before launch* steps again. If you depend on HotSwap, delegate the build to Maven (below). Maven is expected to
+  keep the constructor, but that is not verified either.
+- **Multi-module applications.** The *Before launch* step runs Maven on one POM, without workspace resolution.
+  Sibling modules then come from `~/.m2` and may be stale, and `vidocq:generate` does not repair a module that has
+  no `scanDependencies`. This repository has a single application module. For a multi-module application, delegate
+  the build to Maven.
+
+**Delegating to Maven instead.** With *Settings → Build, Execution, Deployment → Build Tools → Maven → Runner →
+Delegate IDE build/run actions to Maven*, every build runs the Maven lifecycle, `vidocq:generate` included. This is
+slower, and it is a per-machine setting that git does not share.
+
+### Eclipse
+
+Import the repository as an existing Maven project (m2e). Then launch `McpTimeServerApp` with *Run As → Java
+Application*, or pick the shared `mcp-time-server/McpTimeServerApp.launch` under *Run → Run Configurations*.
+
+- The root POM sets `m2e.apt.activation` to `jdt_apt`. m2e-apt then runs the processors of
+  `annotationProcessorPaths`, with `-Avauban.validation=false`, inside JDT's compiler.
+- m2e runs `vidocq:generate` during workspace builds, incremental ones included. No lifecycle mapping covers that
+  execution, so m2e executes it and only reports an informational marker. Do not add an `<ignore/>` mapping for it.
+- m2e derives the project's JRE from `maven.compiler.release`, which gives JavaSE-25.
+
+Nobody has tried this in Eclipse yet. Known risks:
+
+- `vidocq:generate` rewrites files that JDT compiled without refreshing the workspace. The workspace can fall out of
+  sync, and with *Refresh using native hooks or polling* the builds may loop.
+- JDT's incremental builds may truncate the bean index, as IntelliJ's do.
+- JDT does not run Vauban's javac weaving plugin, so Hot Code Replace of a bean class may fail as described for
+  IntelliJ.
+
+*Project → Clean* rebuilds everything, `vidocq:generate` included.
+
+### Known limitation: `convert_time` and `plan_meeting` fail when launched from an IDE
+
+With Vidocq 0.4.0-SNAPSHOT, an IDE-style launch after `mvn process-classes`
+
+```bash
+java -p mcp-time-server/target/classes:<runtime dependency jars> \
+    -m io.vidocq.tools.lc4jcdi.mcptimeserver/io.vidocq.tools.lc4jcdi.mcptimeserver.McpTimeServerApp
+```
+
+passes **4 of the 7** `./test-mcp.sh` checks:
+
+| `test-mcp.sh` checks | Result |
+|---|---|
+| `tools/list`, `tools/call current_time`, `resources/templates/list`, `resources/read` | pass |
+| both `tools/call convert_time` checks, `prompts/get plan_meeting` | fail: `Invocation failed: convertTime - No McpServerSPI implementation found.` (`planMeeting` for the prompt) |
+
+Only the client sees the error; the server logs nothing about it. `convert_time` and `plan_meeting` are the
+examples that build their results through the `org.mcpjava` factories (`ToolResponse.ofText`,
+`ToolResponse.ofError`, `PromptResponse.of`, `TextContent.of`), and those factories look up an `McpServerSPI`
+provider. This is the failure described in "Workarounds" (3) below: on a flat module path, Vidocq moves the MCP
+server into the Vauban application layer but keeps `mcp-server-api` in the boot layer, where the lookup cannot see
+the provider. `run.sh` passes all 7 checks.
+
+The fix belongs upstream, in langchain4j-cdi: `langchain4j-cdi-mcp-server` can declare its provider in its
+`module-info.java`, so that the boot-layer copy of the module serves the lookup:
+
+```java
+provides org.mcpjava.server.spi.McpServerSPI with dev.langchain4j.cdi.mcp.server.spi.CdiMcpServerSPI;
+```
+
+With a `langchain4j-cdi-mcp-server` jar built that way, the same launch passes 7 of 7; built from the same sources
+without that line, it passes 4 of 7. The other possible fix is a class-loader fallback in the MCP API itself
+([mcp-java/java-mcp-annotations#71](https://github.com/mcp-java/java-mcp-annotations/issues/71)).
+
+With Vidocq 0.3.0, the same launch passed only 2 of 7 checks. 0.3.0 moved the MCP server into the application layer
+but left `langchain4j-cdi-mcp-invoker-cdi41` in the boot layer, and every tool, resource and prompt call failed with
+a `ClassCastException` on `McpInvokerProvider`.
+
+Launching from an IDE without any Maven step is tracked upstream in
+[Vidocq/vidocq#83](https://codefloe.com/Vidocq/vidocq/issues/83).
 
 ## Test end to end
 
