@@ -25,8 +25,9 @@ cd mcp-time-server && ./run.sh &        # http://localhost:8080/mcp
 cd .. && ./test-mcp.sh --start
 ```
 
-See the [root README](../README.md) for prerequisites, the `1.4.0-SNAPSHOT` dependency note, and the Vidocq
-host-level workarounds this module relies on (`-Avauban.validation=false` and `run.sh`'s jar re-layering).
+See the [root README](../README.md) for prerequisites, the snapshot dependencies (langchain4j-cdi
+`1.4.0-SNAPSHOT`, Vidocq `0.4.0-SNAPSHOT`), and the Vidocq host-level workarounds this module relies on
+(`-Avauban.validation=false` and `run.sh`'s jar re-layering).
 
 ## Try a tool by hand
 

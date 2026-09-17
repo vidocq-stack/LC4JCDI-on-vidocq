@@ -97,7 +97,7 @@ if [ "$START" -eq 1 ]; then
     fi
     JAVA_MAJOR=$("$JAVA_BIN" -version 2>&1 | head -1 | sed -nE 's/.*version "([0-9]+).*/\1/p')
     if ! [ "${JAVA_MAJOR:-0}" -ge 25 ] 2>/dev/null; then
-        echo "FAIL: JDK 25 or newer is required to run this server (Vidocq 0.3.0 ships Java 25 class files)." >&2
+        echo "FAIL: JDK 25 or newer is required to run this server (Vidocq ships Java 25 class files)." >&2
         echo "      Found: $("$JAVA_BIN" -version 2>&1 | head -1)" >&2
         echo "      Set JAVA_HOME to a JDK 25+ install, e.g. JAVA_HOME=\$(sdk home java 25-tem)." >&2
         exit 1

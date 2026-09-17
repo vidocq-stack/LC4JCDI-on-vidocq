@@ -31,11 +31,23 @@
             contains the MCP 2026-07-28 work (tracked upstream; no release exists yet as of 2026-09).
         -->
         <lc4jcdi.version>1.4.0-SNAPSHOT</lc4jcdi.version>
-        <vidocq.version>0.3.0</vidocq.version>
+        <!--
+            Vidocq is pinned to the 0.4.0-SNAPSHOT line, resolved from the snapshots repository declared below. When
+            the application is launched from a flat module path, as an IDE does, 0.4.0 moves
+            langchain4j-cdi-mcp-invoker-cdi41 into the Vauban application layer together with the MCP server; 0.3.0
+            moved only the MCP server, and every MCP invocation then failed with a ClassCastException on
+            McpInvokerProvider (README.md, "Running from an IDE"). Move this property to 0.4.0 once Vidocq releases it.
+        -->
+        <vidocq.version>0.4.0-SNAPSHOT</vidocq.version>
 
         <junit.version>5.11.4</junit.version>
     </properties>
 
+    <!--
+        One snapshots repository, declared twice: Maven resolves dependencies from <repositories> (langchain4j-cdi
+        1.4.0-SNAPSHOT, the Vidocq 0.4.0-SNAPSHOT jars) but build plugins, such as vidocq-runtime-maven-plugin
+        0.4.0-SNAPSHOT, only from <pluginRepositories>.
+    -->
     <repositories>
         <repository>
             <id>central-snapshots</id>
@@ -49,6 +61,19 @@
             </snapshots>
         </repository>
     </repositories>
+    <pluginRepositories>
+        <pluginRepository>
+            <id>central-snapshots</id>
+            <name>Central Portal Snapshots</name>
+            <url>https://central.sonatype.com/repository/maven-snapshots/</url>
+            <releases>
+                <enabled>false</enabled>
+            </releases>
+            <snapshots>
+                <enabled>true</enabled>
+            </snapshots>
+        </pluginRepository>
+    </pluginRepositories>
 
     <dependencyManagement>
         <dependencies>
@@ -97,7 +122,7 @@
                             <rules>
                                 <requireJavaVersion>
                                     <version>[25,)</version>
-                                    <message>Vidocq 0.3.0 ships Java 25 class files (class file major version 69) and its Maven plugin and runtime both refuse to start on an older JDK. Building this repository requires JDK 25+: point JAVA_HOME at a JDK 25 install (for example "sdk use java 25-tem") and re-run.</message>
+                                    <message>Vidocq ${vidocq.version} ships Java 25 class files (class file major version 69) and its Maven plugin and runtime both refuse to start on an older JDK. Building this repository requires JDK 25+: point JAVA_HOME at a JDK 25 install (for example "sdk use java 25-tem") and re-run.</message>
                                 </requireJavaVersion>
                             </rules>
                         </configuration>

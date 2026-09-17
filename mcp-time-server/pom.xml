@@ -14,7 +14,7 @@
     <name>LC4JCDI on Vidocq: MCP Time Server</name>
     <description>A langchain4j-cdi MCP server (two tools, a resource template and a prompt, all about IANA time
         zones) hosted on the Vidocq runtime suite (Vauban CDI 4.1 Lite + Cassini Jakarta REST + Chappe HTTP).
-        Requires JDK 25, which the Vidocq 0.3.0 artifacts and Maven plugin are compiled for
+        Requires JDK 25, which the Vidocq 0.4.0-SNAPSHOT artifacts and Maven plugin are compiled for
         (class file version 69).</description>
 
     <properties>

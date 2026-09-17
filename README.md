@@ -12,9 +12,9 @@ This repository will grow to host several langchain4j-cdi examples on Vidocq ove
 
 ## Prerequisites
 
-- **JDK 25.** Vidocq 0.3.0 ships Java 25 class files (class file major version 69); its Maven plugin and runtime
-  both refuse to run on an older JDK. Point `JAVA_HOME` at a JDK 25 install for every Maven and `java` command
-  below, e.g. `JAVA_HOME=$(sdk home java 25-tem)`.
+- **JDK 25.** Vidocq 0.4.0-SNAPSHOT ships Java 25 class files (class file major version 69); its Maven plugin and
+  runtime both refuse to run on an older JDK. Point `JAVA_HOME` at a JDK 25 install for every Maven and `java`
+  command below, e.g. `JAVA_HOME=$(sdk home java 25-tem)`.
 - **Maven** (plain `mvn` — this repository has no Maven wrapper and does not want one).
 - **Node.js** (for `npx`, used only by `test-mcp.sh` to run the MCP Inspector CLI).
 
@@ -33,9 +33,9 @@ On an older JDK, the build fails fast with a clear sentence instead of the compi
 POM:
 
 ```
-[ERROR] Vidocq 0.3.0 ships Java 25 class files (class file major version 69) and its Maven plugin and runtime
-both refuse to start on an older JDK. Building this repository requires JDK 25+: point JAVA_HOME at a JDK 25
-install (for example "sdk use java 25-tem") and re-run.
+[ERROR] Vidocq 0.4.0-SNAPSHOT ships Java 25 class files (class file major version 69) and its Maven plugin and
+runtime both refuse to start on an older JDK. Building this repository requires JDK 25+: point JAVA_HOME at a JDK
+25 install (for example "sdk use java 25-tem") and re-run.
 ```
 
 ## Run
@@ -108,39 +108,56 @@ check:
 MCP_URL=http://localhost:8080/mcp ./test-mcp.sh
 ```
 
-## The `1.4.0-SNAPSHOT` dependency
+## The snapshot dependencies
 
 `langchain4j-cdi-mcp-server` and `langchain4j-cdi-mcp-invoker-cdi41` are pinned, in one place
 (`lc4jcdi.version` in the root POM), to `dev.langchain4j.cdi.mcp:*:1.4.0-SNAPSHOT` — **not** the `1.4.0` release.
 The release predates the MCP `2026-07-28` protocol support (tool annotations, resource templates, MRTR) these
-examples exercise, even though its version string sorts higher than the snapshot's. The snapshot is resolved
-from `https://central.sonatype.com/repository/maven-snapshots/`, declared in the root POM with snapshots
-enabled and releases disabled. Move `lc4jcdi.version` to a release coordinate once langchain4j-cdi publishes one
-that contains the MCP `2026-07-28` work.
+examples exercise, even though its version string sorts higher than the snapshot's. Move `lc4jcdi.version` to a
+release coordinate once langchain4j-cdi publishes one that contains the MCP `2026-07-28` work.
+
+Vidocq is pinned the same way (`vidocq.version`) to `0.4.0-SNAPSHOT`: its runtime, annotation processors and
+`vidocq-runtime-maven-plugin`. Launched from a flat module path, as an IDE launches it, 0.4.0 moves
+`langchain4j-cdi-mcp-invoker-cdi41` into the Vauban application layer together with the MCP server; 0.3.0 moved
+only the MCP server, and every MCP invocation then failed with a `ClassCastException` on `McpInvokerProvider`
+(see "Running from an IDE"). Move `vidocq.version` to `0.4.0` once Vidocq releases it.
+
+Both snapshots are resolved from `https://central.sonatype.com/repository/maven-snapshots/`, declared in the root
+POM with snapshots enabled and releases disabled — once under `<repositories>` for the dependencies and once
+under `<pluginRepositories>`, because Maven resolves `vidocq-runtime-maven-plugin` from plugin repositories only.
+No `settings.xml` change is needed.
 
 ## Workarounds
 
-Three host-level workarounds were needed to run langchain4j-cdi's MCP server on Vidocq 0.3.0. None touch MCP
-server production code.
+This module relies on three host-level workarounds, first needed on Vidocq 0.3.0 and kept on 0.4.0-SNAPSHOT.
+None touch MCP server production code.
 
 1. **`-Avauban.validation=false`** on the compiler (`mcp-time-server/pom.xml`). Vauban's build-time bean index
    is built from the packages a *scanned dependency* exports; the cross-module index that actually resolves
    beans living inside `langchain4j-cdi-mcp-server.jar` (the tool/prompt/resource registries and their
    `transport`-package collaborators) is only produced later, by `vidocq:generate` (`process-classes`).
    Bean-resolution validation is therefore deferred to the runtime container, where it succeeds — Vauban's own
-   build warning suggests this exact flag.
+   build warning suggests this exact flag. On 0.4.0-SNAPSHOT the module also compiles without it, because none of
+   its beans injects a bean from the MCP server jar.
 2. ~~Three `--add-exports` compiler flags~~ — **not needed.** An earlier measurement against langchain4j-cdi's
    MCP server found that its module descriptor exported only `…server.registry`, so no module-path consumer
    could compile against `…server.api`, `…server.protocol` or `…server.transport` without `--add-exports`.
    `1.4.0-SNAPSHOT` now exports all three packages, so this module needs none of them.
 3. **`run.sh` moves `langchain4j-cdi-mcp-server`, `mcp-server-api` and `langchain4j-cdi-mcp-invoker-cdi41` from
    `lib/` into `app/` before starting the server.** This one is required. `vidocq:package` puts only the
-   application jar in `app/`, and Vidocq re-layers only that jar into the Vauban child layer.
+   application jar in `app/`, and the generated `bin/mcp-time-server.sh` starts it from one flat module path
+   (`lib` and `app`). Vidocq then moves the application module, and the explicit modules it detects as part of
+   the application (`dev.langchain4j.cdi.mcp.server` and `dev.langchain4j.cdi.mcp.invoker.cdi41`), into the Vauban
+   child layer, but keeps automatic modules such as `mcp-server-api` in the **boot** layer.
    `org.mcpjava.server.spi.McpServerSPILoader` resolves its provider with
-   `ServiceLoader.load(McpServerSPI.class, McpServerSPILoader.class.getClassLoader())` — the class loader of
-   `mcp-server-api`, which stays in the **boot** layer — so it cannot see the provider
-   (`dev.langchain4j.cdi.mcp.server.spi.CdiMcpServerSPI`) that lives in the **child** layer. Every tool, prompt
-   and resource invocation then fails with `No McpServerSPI implementation found`. Reported upstream as
+   `ServiceLoader.load(McpServerSPI.class, McpServerSPI.class.getClassLoader())` — the class loader of
+   `mcp-server-api`, in the boot layer. From there it cannot see the provider
+   (`dev.langchain4j.cdi.mcp.server.spi.CdiMcpServerSPI`) of the **child** layer, and it skips the boot-layer copy
+   of `dev.langchain4j.cdi.mcp.server`: a named module that declares its provider only in `META-INF/services`,
+   which `ServiceLoader` ignores for named modules. Every call whose result is built through the `org.mcpjava`
+   factories (`ToolResponse`, `PromptResponse`, `TextContent`) then fails with `No McpServerSPI implementation
+   found`: with the generated launcher on 0.4.0-SNAPSHOT, `./test-mcp.sh` passes 4 checks of 7, and both
+   `convert_time` checks and the `plan_meeting` check fail. Reported upstream as
    [mcp-java/java-mcp-annotations#71](https://github.com/mcp-java/java-mcp-annotations/issues/71). The fix is
    pure packaging: move the three jars into `app/` and boot through the universal loader
    (`-Dvidocq.app.path=app`), so the service interface and its provider share one layer. `langchain4j-cdi-mcp-invoker-cdi41`
