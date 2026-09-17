@@ -32,14 +32,15 @@ See the [root README](../README.md) for prerequisites, the snapshot dependencies
 ## Running from an IDE
 
 - **IntelliJ IDEA:** run or debug the shared `McpTimeServerApp` configuration (`.run/McpTimeServerApp.run.xml` at
-  the repository root). It runs on JDK 25 (`temurin-25`), builds the module, runs `vidocq:generate` as a *Before
-  launch* step, then starts the server.
+  the repository root). It is set up to run on JDK 25 (`temurin-25`), build the module, run `vidocq:generate` as a
+  *Before launch* step, then start the server. Nobody has tried this in IntelliJ yet.
 - **Eclipse:** import the Maven project and use `McpTimeServerApp.launch` in this directory. The root POM turns on
   JDT annotation processing (`m2e.apt.activation=jdt_apt`). Nobody has tried this in Eclipse yet.
 
-Launched from an IDE, `convert_time` and `plan_meeting` currently fail with `No McpServerSPI implementation found`:
-`./test-mcp.sh` passes 4 of its 7 checks, where `run.sh` passes all 7. The fix is upstream: a `provides` clause for
-`org.mcpjava.server.spi.McpServerSPI` in the `module-info.java` of langchain4j-cdi's MCP server. The
+In an IDE-style launch (one flat module path, after `mvn process-classes`, run from a terminal), `convert_time` and
+`plan_meeting` currently fail with `No McpServerSPI implementation found`: `./test-mcp.sh` passes 4 of its 7 checks,
+where `run.sh` passes all 7. No launch from inside an IDE has been measured yet. The fix is upstream: a `provides`
+clause for `org.mcpjava.server.spi.McpServerSPI` in the `module-info.java` of langchain4j-cdi's MCP server. The
 [root README](../README.md), "Running from an IDE", explains why, and covers the other limits: Debug and HotSwap,
 multi-module applications, and builds without a launch.
 
