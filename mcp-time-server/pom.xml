@@ -168,18 +168,29 @@
                         -->
                         <arg>-Avauban.validation=false</arg>
                     </compilerArgs>
+                    <!--
+                        The Vauban and Cassini annotation processors, referenced as the jars that the
+                        vidocq-runtime-core-codegen and vidocq-runtime-cassini-rest-extension-codegen aggregates
+                        depend on. Those aggregates are published as POMs only, and IntelliJ's Maven import asks for
+                        a jar for every processor path whatever its <type>: the resolution fails without a word,
+                        the module gets no processor path, and IntelliJ's build never runs the processors. Maven
+                        puts the same processor jars on javac's processor path either way.
+
+                        Keep BuildCompatibleExtension jars (cassini-cdi-vauban, for instance) off this path: an
+                        extension that runs here leaves META-INF/vauban-bce-processed in target/classes, and
+                        vidocq:generate then stops rescanning this module, so it no longer repairs the bean index
+                        before an IDE launch (README.md, "Running from an IDE").
+                    -->
                     <annotationProcessorPaths>
                         <path>
-                            <groupId>io.vidocq.runtime</groupId>
-                            <artifactId>vidocq-runtime-core-codegen</artifactId>
+                            <groupId>io.vidocq.vauban</groupId>
+                            <artifactId>vauban-processor</artifactId>
                             <version>${vidocq.version}</version>
-                            <type>pom</type>
                         </path>
                         <path>
-                            <groupId>io.vidocq.runtime.extensions.jakartaee.core</groupId>
-                            <artifactId>vidocq-runtime-cassini-rest-extension-codegen</artifactId>
+                            <groupId>io.vidocq.cassini</groupId>
+                            <artifactId>cassini-processor</artifactId>
                             <version>${vidocq.version}</version>
-                            <type>pom</type>
                         </path>
                     </annotationProcessorPaths>
                 </configuration>
