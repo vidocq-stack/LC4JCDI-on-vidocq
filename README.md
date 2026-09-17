@@ -253,11 +253,18 @@ None touch MCP server production code.
    `convert_time` checks and the `plan_meeting` check fail. Reported upstream as
    [mcp-java/java-mcp-annotations#71](https://github.com/mcp-java/java-mcp-annotations/issues/71). The fix is
    pure packaging: move the three jars into `app/` and boot through the universal loader
-   (`-Dvidocq.app.path=app`), so the service interface and its provider share one layer. `langchain4j-cdi-mcp-invoker-cdi41`
-   is moved for the analogous reason: Vauban discovers its build-compatible extension via `ServiceLoader` inside
-   the application layer, and the synthetic bean it registers must implement the `McpInvokerProvider` interface
-   that the app-layer MCP server injects — left in `lib/` (the boot layer), the extension is invisible and every
-   MCP method silently falls back to reflection.
+   (`-Dvidocq.app.path=app`), so the service interface and its provider share one layer, and `./test-mcp.sh`
+   passes all 7 checks. `langchain4j-cdi-mcp-invoker-cdi41` has to move with the other two. Its module requires
+   both `dev.langchain4j.cdi.mcp.server` and `mcp.server.api`, and `run.sh` keeps `lib/` on the module path with
+   `--add-modules ALL-MODULE-PATH`, so the JVM resolves every module left there in the boot layer. Left in `lib/`,
+   the invoker stops the JVM before `main` with `java.lang.module.FindException: Module
+   dev.langchain4j.cdi.mcp.server not found, required by dev.langchain4j.cdi.mcp.invoker.cdi41` (measured on
+   0.4.0-SNAPSHOT). In `app/`, the synthetic `McpInvokerProvider` bean it registers implements the interface of the
+   MCP server in the same layer, and the log reports `MCP: CDI 4.1 invoker provider ready: 4 method invoker(s)
+   registered`. An invoker split from the MCP server does not fall back to reflection either. With Vidocq 0.3.0 on a
+   flat module path, the MCP server moved into the application layer without it, the synthetic bean implemented
+   the boot-layer copy of `McpInvokerProvider`, and every tool, resource and prompt call failed with a
+   `ClassCastException` (see "Running from an IDE").
 
 ## Examples
 
