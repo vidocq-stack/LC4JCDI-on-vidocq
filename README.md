@@ -61,7 +61,7 @@ JAVA_HOME=/path/to/jdk-25 ./run.sh
 The tasks server keeps every port it opens in 18090-18099, on `127.0.0.1`: the REST API and the MCP endpoint on
 `http://127.0.0.1:18090` (`/tasks`, `/projects`, `/mcp`), and, in a dev launch, the dev console on
 `http://127.0.0.1:18092/`. Its [README](mcp-tasks-server/README.md) has the `vidocq:dev` command, with the debugger
-on 18091.
+on `127.0.0.1:18091`.
 
 ## Running from an IDE
 

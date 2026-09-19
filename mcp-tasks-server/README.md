@@ -31,7 +31,9 @@ or MCP annotation, so both are covered by plain JUnit tests.
 
 ## Ports
 
-Everything this module opens stays in 18090-18099, on the loopback address:
+Everything this module opens stays in 18090-18099, on the loopback address. That includes the debugger of
+`vidocq:dev`: Vidocq's Maven plugin binds its JDWP agent to `127.0.0.1` unless `vidocq.dev.debugHost` says
+otherwise. Keep it there: whoever can reach a debugger can run any code in the JVM.
 
 | Port | What | Where it is set |
 |---|---|---|
@@ -87,7 +89,7 @@ cd mcp-tasks-server && VIDOCQ_MIGRATION_LOCATIONS=filesystem:src/main/resources/
 ```
 
 The three ports are already this module's defaults; the command passes them anyway, so that it shows which ports
-the launch opens. Before using the server, check the log: `Debug agent (JDWP) on port 18091`,
+the launch opens. Before using the server, check the log: `Debug agent (JDWP) on port 18091, host 127.0.0.1`,
 `Vidocq dev console: http://127.0.0.1:18092/` and `Chappe listener 'default' started on http://127.0.0.1:18090/`.
 
 ## The REST API
@@ -215,11 +217,12 @@ event, and adds one borrow too: the transaction keeps one connection from its fi
 for i in $(seq 1 100); do curl -s -o /dev/null http://127.0.0.1:18090/tasks; sleep 0.1; done
 ```
 
-Under `vidocq:dev`, look for the console's URL record, `Vidocq dev console: http://127.0.0.1:18092/`, rather than
-the banner. The banner's context line holds 80 columns, and next to this module's name there is room for neither
-`devconsole :18092` nor the debugger's address: it reads `Java 25.0.3+9-LTS | dev (profile dev) | i.v.t.l.mcptasks
-0.1.0-SNAPSHOT` (measured), and the debugger has a log line of its own, `Vidocq debugger: attach to *:18091`. A
-`run.sh` dev launch shows the segment: `Java 25.0.3+9-LTS | dev (vidocq.launch.mode) | devconsole :18092`.
+Under `vidocq:dev`, look for the log records rather than the banner: `Vidocq dev console: http://127.0.0.1:18092/`,
+`Chappe listener 'default' started on http://127.0.0.1:18090/` and `Vidocq debugger: attach to 127.0.0.1:18091`.
+The banner's context line holds 80 columns, and next to this module's name there is room for neither
+`devconsole :18092` nor the debugger's address: with `Java 25+36-LTS`, the JDK of the repository's `.sdkmanrc`, it
+reads `Java 25+36-LTS | dev (profile dev) | i.v.t.l.mcptasks 0.1.0-SNAPSHOT` (measured). A `run.sh` dev launch
+shows the segment: `Java 25.0.3+9-LTS | dev (vidocq.launch.mode) | devconsole :18092`.
 
 ## Tests
 
