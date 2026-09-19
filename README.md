@@ -4,11 +4,12 @@ Example applications that host [langchain4j-cdi](https://github.com/langchain4j/
 [Vidocq](https://repo1.maven.org/maven2/io/vidocq/) runtime suite — **Vauban** (CDI 4.1 Lite, build-time bean
 index, no reflection-based discovery), **Cassini** (Jakarta RESTful Web Services 4.0) and **Chappe** (HTTP).
 
-This repository will grow to host several langchain4j-cdi examples on Vidocq over time. Today it has one:
+This repository will grow to host several langchain4j-cdi examples on Vidocq over time. Today it has two:
 
 | Module | What it shows |
 |---|---|
 | [`mcp-time-server`](mcp-time-server) | langchain4j-cdi's **MCP server** (tools, a resource template, a prompt) running on Vidocq, including reflection-free method invocation via `langchain4j-cdi-mcp-invoker-cdi41` |
+| [`mcp-tasks-server`](mcp-tasks-server) | A task tracker on an **H2** file database: a **Cassini REST** API writes the tasks through a **Mansart** pool, Jakarta Data repositories and `@Transactional` services, and langchain4j-cdi's **MCP server** reads them; Flyway migrations and the Vidocq **dev console** |
 
 ## Prerequisites
 
@@ -16,17 +17,20 @@ This repository will grow to host several langchain4j-cdi examples on Vidocq ove
   runtime both refuse to run on an older JDK. Point `JAVA_HOME` at a JDK 25 install for every Maven and `java`
   command below, e.g. `JAVA_HOME=$(sdk home java 25-tem)`.
 - **Maven** (plain `mvn` — this repository has no Maven wrapper and does not want one).
-- **Node.js** (for `npx`, used only by `test-mcp.sh` to run the MCP Inspector CLI).
+- **Node.js** (for `npx` and `node`, used only by `test-mcp.sh` and `test-tasks.sh` to run the MCP Inspector CLI
+  and read its JSON).
 
 ## Build
 
 ```bash
 export JAVA_HOME=/path/to/jdk-25
-mvn -B clean verify
+mvn -nsu -B clean verify
 ```
 
 This compiles every module, runs the unit tests (plain JUnit, no container), and produces a runnable
-distribution for `mcp-time-server` under `mcp-time-server/target/mcp-time-server-<version>/`.
+distribution for each server: `mcp-time-server/target/mcp-time-server-<version>/` and
+`mcp-tasks-server/target/mcp-tasks-server-<version>/`. `-nsu` keeps the local install of the Vidocq dev console
+from being replaced (see "The snapshot dependencies").
 
 On an older JDK, the build fails fast with a clear sentence instead of the compiler's opaque
 `release version 25 not supported`, thanks to a `maven-enforcer-plugin` `requireJavaVersion` rule in the root
@@ -48,6 +52,16 @@ JAVA_HOME=/path/to/jdk-25 ./run.sh
 The MCP endpoint is served at `http://localhost:8080/mcp`. Do not use the generated
 `target/<dist>/bin/mcp-time-server.sh` launcher directly — see "Workarounds" below for why `run.sh` exists.
 Another port: `JAVA_OPTS="-Dvidocq.chappe.listener.default.port=8081" ./run.sh`.
+
+```bash
+cd mcp-tasks-server
+JAVA_HOME=/path/to/jdk-25 ./run.sh
+```
+
+The tasks server keeps every port it opens in 18090-18099, on `127.0.0.1`: the REST API and the MCP endpoint on
+`http://127.0.0.1:18090` (`/tasks`, `/projects`, `/mcp`), and, in a dev launch, the dev console on
+`http://127.0.0.1:18092/`. Its [README](mcp-tasks-server/README.md) has the `vidocq:dev` command, with the debugger
+on 18091.
 
 ## Running from an IDE
 
@@ -84,6 +98,12 @@ three things, which nobody has seen it do inside IntelliJ yet (see "Not verified
    of those files only. Measured from the command line, the goal alone takes under a second (0.74 to 0.76 s), and
    an index cut down to one entry is back to its 31 entries afterwards. The goal can run alone because
    `scanDependencies` is configured at plugin level in `mcp-time-server/pom.xml`.
+
+The tasks server has its own shared configuration, **`McpTasksServerApp`** (`.run/McpTasksServerApp.run.xml`), set up
+the same way. It also starts the JVM in `mcp-tasks-server/`, where its H2 database file is, and passes
+`--add-modules ALL-MODULE-PATH`. Its *Before launch* `vidocq:generate` step indexes the MCP server jar, but cannot
+repair that module's own bean index; [its README](mcp-tasks-server/README.md#running-from-an-ide) says why, and what
+was measured.
 
 **Not verified inside IntelliJ yet.** The configuration file uses the format IntelliJ writes, and the processor jars
 follow the code of IntelliJ's Maven import. Both were checked against the IntelliJ IDEA 2026.2 sources (build
@@ -129,7 +149,9 @@ slower, and it is a per-machine setting that git does not share.
 ### Eclipse
 
 Import the repository as an existing Maven project (m2e). Then launch `McpTimeServerApp` with *Run As → Java
-Application*, or pick the shared `mcp-time-server/McpTimeServerApp.launch` under *Run → Run Configurations*.
+Application*, or pick the shared `mcp-time-server/McpTimeServerApp.launch` under *Run → Run Configurations*. For the
+tasks server, pick `mcp-tasks-server/McpTasksServerApp.launch`, which sets the working directory and
+`--add-modules ALL-MODULE-PATH`.
 
 - The root POM sets `m2e.apt.activation` to `jdt_apt`. m2e-apt then runs the processors of
   `annotationProcessorPaths`, with `-Avauban.validation=false`, inside JDT's compiler.
@@ -183,6 +205,10 @@ With a `langchain4j-cdi-mcp-server` jar built that way, the same launch passes 7
 without that line, it passes 4 of 7. The other possible fix is a class-loader fallback in the MCP API itself
 ([mcp-java/java-mcp-annotations#71](https://github.com/mcp-java/java-mcp-annotations/issues/71)).
 
+`mcp-tasks-server` does not have this problem: its tools implement `ToolResponse` themselves and its prompts and
+resources return a `String`, so none of them needs an `McpServerSPI`. In the same IDE-style launch, with
+`--add-modules ALL-MODULE-PATH`, every one of its MCP calls answers (measured from a terminal).
+
 With Vidocq 0.3.0, the same launch passed only 2 of 7 checks. 0.3.0 moved the MCP server into the application layer
 but left `langchain4j-cdi-mcp-invoker-cdi41` in the boot layer, and every tool, resource and prompt call failed with
 a `ClassCastException` on `McpInvokerProvider`.
@@ -216,6 +242,20 @@ check:
 MCP_URL=http://localhost:8080/mcp ./test-mcp.sh
 ```
 
+The tasks server has its own script:
+
+```bash
+./test-tasks.sh --start
+```
+
+It starts the already-built `mcp-tasks-server` through its `run.sh`, as a dev launch on `127.0.0.1:18093` with the
+dev console on 18094, and on a database file of its own, which it deletes on exit. Then it checks, with `curl` and
+the same MCP Inspector CLI: the ports the server listens on, the MCP surface, a task written over REST and read
+back over MCP, the rollback of an all-or-nothing bulk write, validation errors, a prompt, the dev console's pool
+panel and its password redaction, and the data surviving a restart. `--start` is required, because the checks
+count the seeded tasks of a fresh database and restart the server. `TASKS_URL` and `DEVCONSOLE_PORT` pick other
+ports; it refuses 8080, 8888 and any port already taken, and always stops the server on exit.
+
 ## The snapshot dependencies
 
 `langchain4j-cdi-mcp-server` and `langchain4j-cdi-mcp-invoker-cdi41` are pinned, in one place
@@ -235,10 +275,25 @@ POM with snapshots enabled and releases disabled — once under `<repositories>`
 under `<pluginRepositories>`, because Maven resolves `vidocq-runtime-maven-plugin` from plugin repositories only.
 No `settings.xml` change is needed.
 
+**Except, for now, the dev console of `mcp-tasks-server`.**
+`io.vidocq.runtime.extensions.essentials:vidocq-runtime-devconsole-extension` and `vidocq-runtime-devconsole-spi`
+are not published yet. They come from a local install of Vidocq, branch `feat/91-devconsole-slice1` (`mvn install`
+in that checkout), which also installs the pool extension that feeds the console's *Mansart pools* panel, and the
+`vidocq-runtime-maven-plugin` that forwards `-Dvidocq.*` from `vidocq:dev` to the application. Without that install,
+the build of `mcp-tasks-server` cannot resolve the console. Build with `-nsu` (`--no-snapshot-updates`): the
+snapshots repository has builds of the pool extension and of the plugin too, older than the local install today,
+and a newer one deployed there from a branch without the console would replace the local ones without a word,
+taking the panel and the `-D` forwarding away. The pool extension a build used must require the console's SPI:
+
+```bash
+jar --describe-module --file mcp-tasks-server/target/mcp-tasks-server-*/lib/vidocq-runtime-mansart-pool-extension-*.jar | grep devconsole
+```
+
 ## Workarounds
 
-This module relies on three host-level workarounds, first needed on Vidocq 0.3.0 and kept on 0.4.0-SNAPSHOT.
-None touch MCP server production code.
+`mcp-time-server` relies on three host-level workarounds, first needed on Vidocq 0.3.0 and kept on 0.4.0-SNAPSHOT.
+None touch MCP server production code. `mcp-tasks-server` relies on the first and the third too; its own are in
+[its README](mcp-tasks-server/README.md#why-the-code-looks-like-this), "Why the code looks like this".
 
 1. **`-Avauban.validation=false`** on the compiler (`mcp-time-server/pom.xml`). Vauban's build-time bean index
    is built from the packages a *scanned dependency* exports; the cross-module index that actually resolves
@@ -287,6 +342,12 @@ None touch MCP server production code.
 
 Four small, self-contained examples of the MCP server's feature surface, all about IANA time zones — see
 [`mcp-time-server/README.md`](mcp-time-server/README.md).
+
+### `mcp-tasks-server`
+
+A task tracker on H2: Mansart pool, Jakarta Data repositories and transactions behind a Cassini REST API that
+writes, four MCP tools, two resources and two prompts that read, Flyway migrations, and the dev console — see
+[`mcp-tasks-server/README.md`](mcp-tasks-server/README.md).
 
 ## Pending owner decisions
 

@@ -15,6 +15,7 @@
 
     <modules>
         <module>mcp-time-server</module>
+        <module>mcp-tasks-server</module>
     </modules>
 
     <properties>

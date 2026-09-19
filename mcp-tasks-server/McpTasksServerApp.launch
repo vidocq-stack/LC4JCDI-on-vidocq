@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<launchConfiguration type="org.eclipse.jdt.launching.localJavaApplication">
+    <booleanAttribute key="org.eclipse.jdt.launching.ATTR_EXCLUDE_TEST_CODE" value="true"/>
+    <stringAttribute key="org.eclipse.jdt.launching.MAIN_TYPE" value="io.vidocq.tools.lc4jcdi.mcptasks.McpTasksServerApp"/>
+    <stringAttribute key="org.eclipse.jdt.launching.PROJECT_ATTR" value="mcp-tasks-server"/>
+    <stringAttribute key="org.eclipse.jdt.launching.VM_ARGUMENTS" value="--add-modules ALL-MODULE-PATH"/>
+    <stringAttribute key="org.eclipse.jdt.launching.WORKING_DIRECTORY" value="${workspace_loc:mcp-tasks-server}"/>
+</launchConfiguration>

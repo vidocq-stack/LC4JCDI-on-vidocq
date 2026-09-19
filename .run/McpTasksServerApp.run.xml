@@ -1,0 +1,14 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="McpTasksServerApp" type="Application" factoryName="Application">
+    <option name="ALTERNATIVE_JRE_PATH" value="temurin-25" />
+    <option name="ALTERNATIVE_JRE_PATH_ENABLED" value="true" />
+    <option name="MAIN_CLASS_NAME" value="io.vidocq.tools.lc4jcdi.mcptasks.McpTasksServerApp" />
+    <module name="mcp-tasks-server" />
+    <option name="VM_PARAMETERS" value="--add-modules ALL-MODULE-PATH" />
+    <option name="WORKING_DIRECTORY" value="$MODULE_WORKING_DIR$" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+      <option name="Maven.BeforeRunTask" enabled="true" file="$PROJECT_DIR$/mcp-tasks-server/pom.xml" goal="vidocq:generate" />
+    </method>
+  </configuration>
+</component>

@@ -21,4 +21,6 @@ package-lock.json
 
 # test-mcp.sh --start server log
 mcp-time-server-run.log
+# test-tasks.sh --start server log
+mcp-tasks-server-run.log
 
