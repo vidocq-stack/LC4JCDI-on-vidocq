@@ -13,9 +13,11 @@ import org.mcpjava.server.prompts.PromptArg;
  * The MCP prompts: ready-made requests that put the current tasks in front of the model.
  *
  * <p>Each prompt returns a {@code String}, which the MCP server sends as one {@code user} message; the text itself
- * is built by {@link TaskPromptText}. Prompt arguments are strings, and an omitted one arrives as {@code null}: the
- * defaults are applied here. An invalid argument throws, and the MCP server answers the {@code prompts/get} with a
- * JSON-RPC error carrying the message.
+ * is built by {@link TaskPromptText}. A prompt argument is a string on the wire, but the MCP server parses it into
+ * the parameter's declared type: {@code hours} is an {@code int} whose {@code @PromptArg(defaultValue = ...)}
+ * supplies {@value TaskPromptText#DEFAULT_HOURS} when it is omitted. {@code project} stays a {@code String} because
+ * project names are free text. An invalid argument throws, and the MCP server answers the {@code prompts/get} with
+ * a JSON-RPC error carrying the message.
  */
 @ApplicationScoped
 public class TaskPrompts {
@@ -33,8 +35,8 @@ public class TaskPrompts {
      * {@code plan_my_day}: asks the model to plan the day around the open tasks, overdue ones first.
      *
      * @param project a project name, or {@code null} for every project
-     * @param hours the hours available, 1 to {@value TaskPromptText#MAX_HOURS}, or {@code null} for
-     *     {@value TaskPromptText#DEFAULT_HOURS}
+     * @param hours the hours available, 1 to {@value TaskPromptText#MAX_HOURS}, {@value TaskPromptText#DEFAULT_HOURS}
+     *     when omitted
      * @return the text of the user message
      * @throws IllegalArgumentException if the project name or the hours are invalid
      */
@@ -50,10 +52,9 @@ public class TaskPrompts {
                     String project,
             @PromptArg(
                             name = "hours",
-                            description = "The hours available today, 1 to " + TaskPromptText.MAX_HOURS + ". "
-                                    + TaskPromptText.DEFAULT_HOURS + " when omitted.",
-                            required = false)
-                    String hours) {
+                            description = "The hours available today, 1 to " + TaskPromptText.MAX_HOURS + ".",
+                            defaultValue = "" + TaskPromptText.DEFAULT_HOURS)
+                    int hours) {
         int available = TaskPromptText.hours(hours);
         String p = project == null || project.isBlank() ? null : TaskRules.project(project);
         return TaskPromptText.planMyDay(LocalDate.now(clock), available, p, queries.list(TaskStatus.OPEN.name(), p));

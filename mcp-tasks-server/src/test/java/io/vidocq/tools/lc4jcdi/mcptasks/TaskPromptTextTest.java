@@ -123,14 +123,13 @@ class TaskPromptTextTest {
     }
 
     @Test
-    void hoursDefaultsToSixAndStaysWithinADay() {
-        assertEquals(6, TaskPromptText.hours(null));
-        assertEquals(6, TaskPromptText.hours(" "));
-        assertEquals(3, TaskPromptText.hours(" 3 "));
-        assertEquals(12, TaskPromptText.hours("12"));
-        for (String bad : List.of("0", "13", "-1", "two", "2.5")) {
+    void hoursStaysWithinADay() {
+        assertEquals(3, TaskPromptText.hours(3));
+        assertEquals(6, TaskPromptText.hours(6));
+        assertEquals(12, TaskPromptText.hours(12));
+        for (int bad : new int[] {0, 13, -1}) {
             IllegalArgumentException e =
-                    assertThrows(IllegalArgumentException.class, () -> TaskPromptText.hours(bad), bad);
+                    assertThrows(IllegalArgumentException.class, () -> TaskPromptText.hours(bad), "" + bad);
             assertTrue(e.getMessage().contains("hours"), e.getMessage());
             assertTrue(e.getMessage().contains("1 to 12"), e.getMessage());
         }

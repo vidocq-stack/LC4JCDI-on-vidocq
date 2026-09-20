@@ -14,9 +14,12 @@ import org.mcpjava.server.tools.ToolResponse;
  * reports an invalid argument or an unknown id as an {@code isError} result carrying the message, never as an
  * exception: the model sees what was wrong and can try again.
  *
- * <p>The arguments are {@code String}, {@code Integer}, {@code Long} or {@code Boolean}, and an omitted one arrives
- * as {@code null}: this MCP server converts neither enums nor dates, and never applies
- * {@code ToolArg.defaultValue}. {@link TaskRules} parses the strings and applies the defaults.
+ * <p>Arguments use their natural type: {@link TaskPriority} for {@code priority}, and {@code int}/{@code boolean}
+ * with an {@code @ToolArg(defaultValue = ...)} for {@code limit} and {@code includeDone}. The MCP server applies the
+ * default and rejects a value of the wrong JSON type before this class ever runs; {@code id} stays a boxed
+ * {@link Long} because a missing task id is business validation, not a type check, and {@code project} and
+ * {@code dueBefore} stay {@code String} because the server does not convert free text or dates.
+ * {@link TaskRules} still validates the fields it always has: the project name, the due date and the search query.
  *
  * <p>The MCP endpoint that hosts these tools lives in the {@code langchain4j-cdi-mcp-server} dependency jar, which
  * {@code vidocq:generate} indexes ({@code scanDependencies}); the bean is {@link ApplicationScoped} like every MCP
@@ -37,7 +40,7 @@ public class TaskTools {
      * @param project a project name, or {@code null} for every project
      * @param priority the minimum priority, or {@code null}
      * @param dueBefore an ISO date, inclusive, or {@code null}
-     * @param limit the maximum number of tasks, or {@code null} for {@value TaskRules#DEFAULT_LIMIT}
+     * @param limit the maximum number of tasks, {@value TaskRules#DEFAULT_LIMIT} when omitted
      * @return {@code {"count": n, "tasks": [...]}}, or an error naming the invalid argument
      */
     @Tool(
@@ -55,10 +58,10 @@ public class TaskTools {
                     String project,
             @ToolArg(
                             name = "priority",
-                            description = "The minimum priority: LOW, MEDIUM or HIGH. MEDIUM keeps the MEDIUM and"
-                                    + " HIGH tasks. Any priority when omitted.",
+                            description = "The minimum priority. MEDIUM keeps the MEDIUM and HIGH tasks. Any"
+                                    + " priority when omitted.",
                             required = false)
-                    String priority,
+                    TaskPriority priority,
             @ToolArg(
                             name = "dueBefore",
                             description = "An ISO date, yyyy-MM-dd: only the tasks due on or before it, which leaves"
@@ -67,12 +70,11 @@ public class TaskTools {
                     String dueBefore,
             @ToolArg(
                             name = "limit",
-                            description = "The maximum number of tasks, 1 to " + TaskRules.MAX_LIMIT + ". "
-                                    + TaskRules.DEFAULT_LIMIT + " when omitted.",
-                            required = false)
-                    Integer limit) {
+                            description = "The maximum number of tasks, 1 to " + TaskRules.MAX_LIMIT + ".",
+                            defaultValue = "" + TaskRules.DEFAULT_LIMIT)
+                    int limit) {
         try {
-            return list(queries.openTasks(project, priority, dueBefore, limit));
+            return list(queries.openTasks(project, priority == null ? null : priority.name(), dueBefore, limit));
         } catch (IllegalArgumentException e) {
             return McpResults.error(e.getMessage());
         }
@@ -82,8 +84,8 @@ public class TaskTools {
      * {@code search_tasks}: the tasks whose title or description contains the query, ignoring case.
      *
      * @param query at least 2 characters
-     * @param includeDone {@code true} to include the done tasks; {@code null} means {@code false}
-     * @param limit the maximum number of tasks, or {@code null} for {@value TaskRules#DEFAULT_LIMIT}
+     * @param includeDone {@code true} to include the done tasks; {@code false} when omitted
+     * @param limit the maximum number of tasks, {@value TaskRules#DEFAULT_LIMIT} when omitted
      * @return {@code {"count": n, "tasks": [...]}}, or an error when the query is too short
      */
     @Tool(
@@ -98,19 +100,15 @@ public class TaskTools {
                             description = "The words to look for, at least 2 characters. % and _ are not"
                                     + " wildcards: they are ignored.")
                     String query,
-            @ToolArg(
-                            name = "includeDone",
-                            description = "true to search the done tasks too. false when omitted.",
-                            required = false)
-                    Boolean includeDone,
+            @ToolArg(name = "includeDone", description = "true to search the done tasks too.", defaultValue = "false")
+                    boolean includeDone,
             @ToolArg(
                             name = "limit",
-                            description = "The maximum number of tasks, 1 to " + TaskRules.MAX_LIMIT + ". "
-                                    + TaskRules.DEFAULT_LIMIT + " when omitted.",
-                            required = false)
-                    Integer limit) {
+                            description = "The maximum number of tasks, 1 to " + TaskRules.MAX_LIMIT + ".",
+                            defaultValue = "" + TaskRules.DEFAULT_LIMIT)
+                    int limit) {
         try {
-            return list(queries.search(query, Boolean.TRUE.equals(includeDone), limit));
+            return list(queries.search(query, includeDone, limit));
         } catch (IllegalArgumentException e) {
             return McpResults.error(e.getMessage());
         }

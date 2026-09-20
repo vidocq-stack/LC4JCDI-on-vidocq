@@ -443,9 +443,11 @@ v=$(printf '%s' "$R_BODY" | json 'j.error + "|" + (j.message.length > 0)')
 check "POST /tasks with an empty title answers 400 with a message and no stack trace" "$R_STATUS $R_BODY" \
     "$(ok_if [ "$R_STATUS|$v" = "400|bad_request|true" ] && ! printf '%s' "$R_BODY" | grep -qE '\.java:[0-9]')"
 
+# priority is a TaskPriority enum argument (langchain4j-cdi#298): a value outside LOW/MEDIUM/HIGH is rejected by
+# the MCP server itself, before the tool ever runs, naming the argument and the accepted values.
 out=$(inspector --method tools/call --tool-name list_open_tasks --tool-arg priority=URGENT)
-v=$(printf '%s' "$out" | json 'j.isError === true && j.content[0].text.includes("LOW, MEDIUM, HIGH")')
-check "tools/call list_open_tasks (priority=URGENT) answers isError with the accepted values" "$out" \
+v=$(printf '%s' "$out" | json 'j.error && j.error.message.includes("priority") && j.error.message.includes("LOW, MEDIUM, HIGH")')
+check "tools/call list_open_tasks (priority=URGENT) is rejected as an invalid argument naming priority and the accepted values" "$out" \
     "$(ok_if is_true "$v" && ! printf '%s' "$out" | grep -qE '\.java:[0-9]')"
 
 # 9. A prompt built on the current tasks.

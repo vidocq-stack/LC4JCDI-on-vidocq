@@ -25,9 +25,11 @@ public class TaskResources {
     /**
      * {@code task://{id}}: a task and its history.
      *
+     * <p>The MCP server parses the {@code {id}} URI variable, a string on the wire, into this {@code long}
+     * parameter, and rejects a non-numeric one before this method runs.
+     *
      * @param id the id in the URI
      * @return the {@link TaskDetails} as JSON
-     * @throws IllegalArgumentException if the id is not a number
      * @throws TaskNotFoundException if no task has this id
      */
     @ResourceTemplate(
@@ -35,9 +37,8 @@ public class TaskResources {
             description = "A task and its history, oldest event first, by id: task://3.",
             uriTemplate = "task://{id}",
             mimeType = "application/json")
-    public String task(@ResourceTemplateArg(name = "id") String id) {
-        long taskId = id(id);
-        return TaskJson.of(queries.details(taskId).orElseThrow(() -> new TaskNotFoundException(taskId)));
+    public String task(@ResourceTemplateArg(name = "id") long id) {
+        return TaskJson.of(queries.details(id).orElseThrow(() -> new TaskNotFoundException(id)));
     }
 
     /**
@@ -53,17 +54,5 @@ public class TaskResources {
             mimeType = "application/json")
     public String summary() {
         return TaskJson.of(queries.stats(null));
-    }
-
-    private static long id(String raw) {
-        if (raw == null || raw.isBlank()) {
-            throw new IllegalArgumentException("a task id is required: task://<id>, such as task://3");
-        }
-        try {
-            return Long.parseLong(raw.strip());
-        } catch (NumberFormatException e) {
-            throw new IllegalArgumentException(
-                    "task id '" + raw.strip() + "' is not a number: use task://<id>, such as task://3");
-        }
     }
 }

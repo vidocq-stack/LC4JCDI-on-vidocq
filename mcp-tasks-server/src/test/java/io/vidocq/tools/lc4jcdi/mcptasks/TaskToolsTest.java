@@ -61,33 +61,37 @@ class TaskToolsTest {
 
     @Test
     void listOpenTasksIsInUrgencyOrderAndFilters() {
-        assertEquals(List.of(2L, 3L, 1L, 4L, 6L, 5L), ids(ok(tools.listOpenTasks(null, null, null, null))));
-        assertEquals(List.of(3L, 1L), ids(ok(tools.listOpenTasks(null, "high", null, null))));
-        assertEquals(List.of(3L, 4L, 5L), ids(ok(tools.listOpenTasks("LC4JCDI", null, null, null))));
+        assertEquals(
+                List.of(2L, 3L, 1L, 4L, 6L, 5L),
+                ids(ok(tools.listOpenTasks(null, null, null, TaskRules.DEFAULT_LIMIT))));
+        assertEquals(
+                List.of(3L, 1L),
+                ids(ok(tools.listOpenTasks(null, TaskPriority.HIGH, null, TaskRules.DEFAULT_LIMIT))));
+        assertEquals(
+                List.of(3L, 4L, 5L),
+                ids(ok(tools.listOpenTasks("LC4JCDI", null, null, TaskRules.DEFAULT_LIMIT))));
         assertEquals(List.of(2L, 3L), ids(ok(tools.listOpenTasks(null, null, null, 2))));
-        assertEquals(List.of(), ids(ok(tools.listOpenTasks("nope", null, null, null))));
+        assertEquals(List.of(), ids(ok(tools.listOpenTasks("nope", null, null, TaskRules.DEFAULT_LIMIT))));
     }
 
     @Test
     void listOpenTasksRejectsBadArgumentsAsToolErrors() {
-        String priority = error(tools.listOpenTasks(null, "URGENT", null, null));
-        assertTrue(priority.contains("LOW, MEDIUM, HIGH"), priority);
-        String date = error(tools.listOpenTasks(null, null, "tomorrow", null));
+        // Priority is bound by the MCP server itself now: only TaskRules-validated fields reach this tool.
+        String date = error(tools.listOpenTasks(null, null, "tomorrow", TaskRules.DEFAULT_LIMIT));
         assertTrue(date.contains("dueBefore") && date.contains("yyyy-MM-dd"), date);
-        String project = error(tools.listOpenTasks("Not A Project", null, null, null));
+        String project = error(tools.listOpenTasks("Not A Project", null, null, TaskRules.DEFAULT_LIMIT));
         assertTrue(project.contains("project"), project);
     }
 
     @Test
     void searchTasksSkipsDoneTasksUnlessAsked() {
-        assertEquals(List.of(2L), ids(ok(tools.searchTasks("REDACTION", null, null))));
-        assertEquals(List.of(), ids(ok(tools.searchTasks("dns", null, null))));
-        assertEquals(List.of(), ids(ok(tools.searchTasks("dns", false, null))));
-        assertEquals(List.of(7L), ids(ok(tools.searchTasks("dns", true, null))));
+        assertEquals(List.of(2L), ids(ok(tools.searchTasks("REDACTION", false, TaskRules.DEFAULT_LIMIT))));
+        assertEquals(List.of(), ids(ok(tools.searchTasks("dns", false, TaskRules.DEFAULT_LIMIT))));
+        assertEquals(List.of(7L), ids(ok(tools.searchTasks("dns", true, TaskRules.DEFAULT_LIMIT))));
         assertEquals(1, ok(tools.searchTasks("the", true, 1)).getInt("count"));
-        String tooShort = error(tools.searchTasks("x", null, null));
+        String tooShort = error(tools.searchTasks("x", false, TaskRules.DEFAULT_LIMIT));
         assertTrue(tooShort.contains("at least 2 characters"), tooShort);
-        error(tools.searchTasks(null, null, null));
+        error(tools.searchTasks(null, false, TaskRules.DEFAULT_LIMIT));
     }
 
     @Test

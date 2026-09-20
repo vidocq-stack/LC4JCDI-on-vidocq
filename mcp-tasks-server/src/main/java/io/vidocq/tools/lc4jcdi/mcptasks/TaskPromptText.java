@@ -27,23 +27,14 @@ public final class TaskPromptText {
     private TaskPromptText() {}
 
     /**
-     * Parses the hours available for a day's plan. Prompt arguments are always strings.
+     * Validates the hours available for a day's plan. The MCP server already parsed the {@code @PromptArg} into an
+     * {@code int}, applying {@value #DEFAULT_HOURS} when it was omitted; this only checks the range.
      *
-     * @param raw a whole number of hours, or {@code null}
-     * @return {@value #DEFAULT_HOURS} when absent or blank, otherwise the number
-     * @throws IllegalArgumentException if it is not a whole number from 1 to {@value #MAX_HOURS}
+     * @param hours a whole number of hours
+     * @return {@code hours}
+     * @throws IllegalArgumentException if it is not 1 to {@value #MAX_HOURS}
      */
-    public static int hours(String raw) {
-        if (raw == null || raw.isBlank()) {
-            return DEFAULT_HOURS;
-        }
-        int hours;
-        try {
-            hours = Integer.parseInt(raw.strip());
-        } catch (NumberFormatException e) {
-            throw new IllegalArgumentException(
-                    "hours '" + raw.strip() + "' is not a whole number: use 1 to " + MAX_HOURS);
-        }
+    public static int hours(int hours) {
         if (hours < 1 || hours > MAX_HOURS) {
             throw new IllegalArgumentException("hours must be 1 to " + MAX_HOURS + ", got " + hours);
         }

@@ -143,13 +143,13 @@ The MCP endpoint is `http://127.0.0.1:18090/mcp`. It only reads: every tool is m
 
 | Kind | Name | Arguments | Answers |
 |---|---|---|---|
-| Tool | `list_open_tasks` | `project`, `priority` (the minimum: `LOW`, `MEDIUM` or `HIGH`), `dueBefore` (`yyyy-MM-dd`, inclusive), `limit` (1 to 100, 20 by default); all optional | `{"count": n, "tasks": [...]}`, most urgent first |
-| Tool | `search_tasks` | `query` (at least 2 characters), `includeDone` (false by default), `limit` | the tasks whose title or description holds the query, ignoring case |
+| Tool | `list_open_tasks` | `project`, `priority` (an enum, the minimum: `LOW`, `MEDIUM` or `HIGH`), `dueBefore` (`yyyy-MM-dd`, inclusive), `limit` (1 to 100, `defaultValue = "20"`); all optional | `{"count": n, "tasks": [...]}`, most urgent first |
+| Tool | `search_tasks` | `query` (at least 2 characters), `includeDone` (`boolean`, `defaultValue = "false"`), `limit` (`int`, `defaultValue = "20"`) | the tasks whose title or description holds the query, ignoring case |
 | Tool | `task_statistics` | `project`, optional | total, open, done, overdue, due today, due in the next 7 days, open tasks per priority, counts per project |
 | Tool | `get_task` | `id` | the task and its history; `isError` for an unknown id |
 | Resource template | `task://{id}` | | the task and its history; a JSON-RPC error for an unknown id |
 | Resource | `tasks://summary` | | the statistics of every project |
-| Prompt | `plan_my_day` | `project`, `hours` (6 by default); both optional | asks the model to plan the day: overdue tasks first, breaks, what does not fit deferred with a reason |
+| Prompt | `plan_my_day` | `project`, `hours` (`int`, 1 to 12, `defaultValue = "6"`); both optional | asks the model to plan the day: overdue tasks first, breaks, what does not fit deferred with a reason |
 | Prompt | `review_project` | `project` | asks for a status summary, the risks, and the next three actions |
 
 Try each of them with the [MCP Inspector CLI](https://www.npmjs.com/package/@modelcontextprotocol/inspector):
@@ -276,10 +276,17 @@ incremental IDE build: see the last point of "Why the code looks like this".
   fails with `No McpServerSPI implementation found` in an IDE-style launch (root README, "Known limitation"). The
   MCP server serializes any `ToolResponse` by its interface, so these records go on the wire as the factories'
   objects would, in every launch.
-- **Tool arguments are `String`, `Integer`, `Long` or `Boolean`, with the defaults applied in Java.** The MCP server
-  converts no enum and no date, and never applies `@ToolArg(defaultValue)`: an omitted argument arrives as `null`.
-  The Inspector CLI sends `limit=5` as a JSON number and `includeDone=true` as a JSON boolean, which bind; a client
-  that sends `"5"` as a string gets `-32603 Internal error`.
+- **Tool, prompt and resource-template arguments use their natural type.** `list_open_tasks`'s `priority` is a
+  `TaskPriority`, `search_tasks`'s `includeDone` is a `boolean`, `limit` is an `int`, `plan_my_day`'s `hours` is an
+  `int`, and `task://{id}` binds straight to a `long`. `limit`, `includeDone` and `hours` carry an
+  `@ToolArg`/`@PromptArg(defaultValue = ...)` instead of a Java-side default, so `tools/list` and `prompts/list`
+  advertise them as optional with that default in the schema, and an omitted one arrives already converted: no
+  `TaskRules` parsing needed for those three. `project` and `dueBefore` stay `String`: a project name is free text,
+  and the server does not convert dates. A client that sends the wrong JSON type — `"5"` for `limit`, `"URGENT"`
+  for `priority`, a non-numeric `task://abc` — is rejected with a message naming the argument and the expected
+  type, not a `500` or a silently wrong value; see the `langchain4j-cdi-mcp` module's README, "Supported parameter
+  types" and "Argument types are checked", for how the binder does that. `TaskRules` still validates the project
+  name, the due date and the search query, none of which the server can type-check on its own.
 - **Flyway finds the scripts on the class path under `vidocq:dev` and `run.sh`.** Its default,
   `classpath:db/migration`, used to find nothing in those launches ("No migrations found", `applied=0
   version=(none)` on a fresh database): the application module lived in Vauban's child layer, while Flyway scanned
