@@ -26,10 +26,6 @@ for jar in langchain4j-cdi-mcp-server mcp-server-api langchain4j-cdi-mcp-invoker
     f=$(ls "$DIST"/lib/"$jar"-*.jar 2>/dev/null | head -1)
     [ -n "$f" ] && mv "$f" "$DIST/app/"
 done
-# Flyway reads the scripts from the source tree: classpath:db/migration is invisible from the boot layer, and
-# the property key vidocq.migration.locations fails the boot in Vidocq 0.4.0-SNAPSHOT (vidocq.properties says
-# why). The configuration resolves this environment variable for that key instead.
-export VIDOCQ_MIGRATION_LOCATIONS="${VIDOCQ_MIGRATION_LOCATIONS:-filesystem:$BASE/src/main/resources/db/migration}"
 cd "$BASE"
 exec "${JAVA_HOME:-/usr}/bin/java" \
     --module-path "$DIST/lib" \

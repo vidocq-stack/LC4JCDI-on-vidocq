@@ -79,13 +79,12 @@ Run the distribution:
 cd mcp-tasks-server && ./run.sh
 ```
 
-The server listens on `http://127.0.0.1:18090`. `run.sh` also sets where Flyway reads the scripts ("Why the code
-looks like this" below).
+The server listens on `http://127.0.0.1:18090`.
 
 Or run it in dev mode, which recompiles and reloads on every change:
 
 ```bash
-cd mcp-tasks-server && VIDOCQ_MIGRATION_LOCATIONS=filesystem:src/main/resources/db/migration mvn -nsu process-classes vidocq:dev -Dvidocq.chappe.listener.default.port=18090 -Dvidocq.dev.debugPort=18091 -Dvidocq.devconsole.port=18092
+cd mcp-tasks-server && mvn -nsu process-classes vidocq:dev -Dvidocq.chappe.listener.default.port=18090 -Dvidocq.dev.debugPort=18091 -Dvidocq.devconsole.port=18092
 ```
 
 The three ports are already this module's defaults; the command passes them anyway, so that it shows which ports
@@ -254,8 +253,8 @@ That option was measured from a terminal, with the IDE-style launch of the
 `NoClassDefFoundError: com/fasterxml/jackson/databind/ObjectMapper`: nothing the application requires reads
 Jackson, so the JVM does not resolve it. `mansart-transactions-jdbc` is in the same case: `mansart-data-cdi` only
 has a `requires static` on it, which does not resolve it either. With `--add-modules ALL-MODULE-PATH`, the
-application boots, Flyway finds its scripts on the class path (no `VIDOCQ_MIGRATION_LOCATIONS` is needed in that
-launch), every MCP call answers, and the bulk completion rolls back.
+application boots, Flyway finds its scripts on the class path, every MCP call answers, and the bulk completion
+rolls back.
 Nobody has run either configuration inside an IDE yet, and an IDE may split the jars between the module path and
 the class path differently.
 
@@ -279,14 +278,12 @@ incremental IDE build: see the last point of "Why the code looks like this".
   converts no enum and no date, and never applies `@ToolArg(defaultValue)`: an omitted argument arrives as `null`.
   The Inspector CLI sends `limit=5` as a JSON number and `includeDone=true` as a JSON boolean, which bind; a client
   that sends `"5"` as a string gets `-32603 Internal error`.
-- **Flyway reads the scripts from the source tree under `vidocq:dev` and `run.sh`.** Its default,
-  `classpath:db/migration`, finds nothing in those launches ("No migrations found", `applied=0 version=(none)` on a
-  fresh database): the application module lives in Vauban's child layer, while Flyway scans with the class loader of
-  the migration extension, in the boot layer. The location has to be `filesystem:src/main/resources/db/migration`,
-  but in Vidocq 0.4.0-SNAPSHOT the key `vidocq.migration.locations`, in `vidocq.properties` or as a `-D`, fails the
-  boot with a `StringIndexOutOfBoundsException` in `MigrationExtension`. The environment variable
-  `VIDOCQ_MIGRATION_LOCATIONS` sets the same key without that failure: `run.sh` exports it, and the `vidocq:dev`
-  command above passes it.
+- **Flyway finds the scripts on the class path under `vidocq:dev` and `run.sh`.** Its default,
+  `classpath:db/migration`, used to find nothing in those launches ("No migrations found", `applied=0
+  version=(none)` on a fresh database): the application module lived in Vauban's child layer, while Flyway scanned
+  with the class loader of the migration extension, in the boot layer. Vidocq/vidocq#96 fixed that layering, so
+  both launches now apply the two migrations from the class path and neither sets
+  `vidocq.migration.locations` nor an environment variable for it.
 - **After a restart, the log reads `Migration done: datasource=default applied=0 version=(none)`.** That is not the
   failure above: Flyway reports no target version when it applies nothing. Its own line just before, `Current version
   of schema "PUBLIC": 2`, gives the version.
