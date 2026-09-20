@@ -17,7 +17,7 @@
 set -u
 
 INSPECTOR_PKG="@modelcontextprotocol/inspector@2.6.0"
-MCP_URL="${MCP_URL:-http://localhost:8080/mcp}"
+MCP_URL="${MCP_URL:-http://localhost:18080/mcp}"
 START=0
 SERVER_PID=""
 
@@ -105,7 +105,7 @@ if [ "$START" -eq 1 ]; then
         exit 1
     fi
 
-    # The server listens on the port of MCP_URL, so --start can run next to a server already on 8080.
+    # The server listens on the port of MCP_URL, so --start can run next to one already on 18080.
     PORT=$(printf '%s' "$MCP_URL" | sed -nE 's#^[a-z]+://[^/:]+:([0-9]+).*#\1#p')
     PORT="${PORT:-80}"
     if command -v lsof >/dev/null 2>&1 && lsof -ti "tcp:$PORT" -sTCP:LISTEN >/dev/null 2>&1; then
@@ -113,7 +113,7 @@ if [ "$START" -eq 1 ]; then
         echo "FAIL: port $PORT is already in use by pid $HOLDER ($(ps -o comm= -p "$HOLDER" 2>/dev/null))." >&2
         echo "      --start would not be testing its own server. Either stop that process, drop --start to" >&2
         echo "      test the server already running, or start on another port:" >&2
-        echo "      MCP_URL=http://localhost:8081/mcp $0 --start" >&2
+        echo "      MCP_URL=http://localhost:18081/mcp $0 --start" >&2
         exit 1
     fi
 
