@@ -99,19 +99,6 @@
             <artifactId>vidocq-runtime-mansart-transactions-extension</artifactId>
             <version>${vidocq.version}</version>
         </dependency>
-        <!--
-            The JDBC side of Mansart transactions. mansart-data-cdi enlists a repository's connection in the
-            current JTA transaction only when io.vidocq.mansart.transactions.jdbc.ConnectionXAResource loads
-            (JtaBridgeActivator); otherwise every repository call autocommits on its own and @Transactional
-            rolls nothing back. mansart-data-cdi declares this artifact optional, and none of the three
-            extensions above brings it, so it is declared here.
-        -->
-        <dependency>
-            <groupId>io.vidocq.mansart</groupId>
-            <artifactId>mansart-transactions-jdbc</artifactId>
-            <version>${vidocq.version}</version>
-            <scope>runtime</scope>
-        </dependency>
         <!-- The SQL dialect, found through ServiceLoader. -->
         <dependency>
             <groupId>io.vidocq.mansart</groupId>

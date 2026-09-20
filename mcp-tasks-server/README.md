@@ -263,11 +263,13 @@ incremental IDE build: see the last point of "Why the code looks like this".
 
 ## Why the code looks like this
 
-- **`mansart-transactions-jdbc` is a dependency** (`pom.xml`). `mansart-data-cdi` enlists a repository's connection
-  in the current JTA transaction only when that artifact is on the module path. It declares it optional, and none of
-  the Mansart extensions brings it. Measured under `vidocq:dev`: without it, `POST /tasks/complete {"ids":[6,999999]}`
-  still answers 404, but task 6 is DONE and its `COMPLETED` event is committed; with it, task 6 stays OPEN and has no
-  such event.
+- **Rollback holds without declaring `mansart-transactions-jdbc`.** `mansart-data-cdi` enlists a repository's
+  connection in the current JTA transaction only when `io.vidocq.mansart.transactions.jdbc.ConnectionXAResource`
+  loads. It declares that artifact optional, and used to need it added here by hand, since none of the Mansart
+  extensions brought it as a runtime dependency. Vidocq/vidocq#97 fixed that: `vidocq-runtime-mansart-transactions-extension`
+  now brings `mansart-transactions-jdbc` as a compile dependency with a `requires`, so this module gets the bridge
+  from the extension alone. Measured under `vidocq:dev`: `POST /tasks/complete {"ids":[6,999999]}` still answers
+  404, task 6 stays OPEN and has no `COMPLETED` event.
 - **The tools return `McpResults`, the prompts and resources a `String`.** `McpResults` implements the `org.mcpjava`
   `ToolResponse` and `TextContent` interfaces with records. The API's static factories (`ToolResponse.ofText`,
   `ofError`, `builder`, `TextContent.of`, `PromptResponse.of`) look up an `McpServerSPI` provider, and that lookup
