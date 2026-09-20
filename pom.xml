@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>io.vidocq.tools</groupId>
@@ -10,7 +10,8 @@
 
     <name>LangChain4j CDI on Vidocq</name>
     <description>Examples showing dev.langchain4j.cdi (LangChain4j CDI) components hosted on the Vidocq runtime
-        suite (Vauban CDI 4.1 Lite + Cassini Jakarta REST + Chappe HTTP).</description>
+        suite (Vauban CDI 4.1 Lite + Cassini Jakarta REST + Chappe HTTP).
+    </description>
     <url>https://codefloe.com/VidocqTools/LC4JCDI-on-vidocq</url>
 
     <modules>
@@ -46,6 +47,12 @@
             McpInvokerProvider (README.md, "Running from an IDE"). Move this property to 0.4.0 once Vidocq releases it.
         -->
         <vidocq.version>0.4.0-SNAPSHOT</vidocq.version>
+
+        <!--
+            IntelliJ SDK name written by vidocq:idea into .run/*.run.xml as the alternative JRE, so that Run
+            launches the application on the JDK it is built and tested with, whatever the module SDK is.
+        -->
+        <vidocq.idea.jre>temurin-25</vidocq.idea.jre>
 
         <junit.version>5.11.4</junit.version>
     </properties>
@@ -93,7 +100,14 @@
             </dependency>
         </dependencies>
     </dependencyManagement>
+    <dependencies>
 
+        <dependency>
+            <groupId>io.vidocq.runtime.extensions.essentials</groupId>
+            <artifactId>vidocq-runtime-devconsole-extension</artifactId>
+            <version>${vidocq.version}</version>
+        </dependency>
+    </dependencies>
     <build>
         <pluginManagement>
             <plugins>
@@ -112,6 +126,16 @@
                     <artifactId>maven-surefire-plugin</artifactId>
                     <version>3.5.2</version>
                 </plugin>
+                <!--
+                    Declared here, with its version, so that Maven resolves the "vidocq:" goal prefix from the
+                    top-level project: `mvn vidocq:idea` instead of the full coordinates. The plugin is bound to
+                    a phase only in mcp-time-server, where vidocq:generate must run.
+                -->
+                <plugin>
+                    <groupId>io.vidocq.runtime</groupId>
+                    <artifactId>vidocq-runtime-maven-plugin</artifactId>
+                    <version>${vidocq.version}</version>
+                </plugin>
             </plugins>
         </pluginManagement>
         <plugins>
@@ -129,7 +153,11 @@
                             <rules>
                                 <requireJavaVersion>
                                     <version>[25,)</version>
-                                    <message>Vidocq ${vidocq.version} ships Java 25 class files (class file major version 69) and its Maven plugin and runtime both refuse to start on an older JDK. Building this repository requires JDK 25+: point JAVA_HOME at a JDK 25 install (for example "sdk use java 25-tem") and re-run.</message>
+                                    <message>Vidocq ${vidocq.version} ships Java 25 class files (class file major
+                                        version 69) and its Maven plugin and runtime both refuse to start on an older
+                                        JDK. Building this repository requires JDK 25+: point JAVA_HOME at a JDK 25
+                                        install (for example "sdk use java 25-tem") and re-run.
+                                    </message>
                                 </requireJavaVersion>
                             </rules>
                         </configuration>

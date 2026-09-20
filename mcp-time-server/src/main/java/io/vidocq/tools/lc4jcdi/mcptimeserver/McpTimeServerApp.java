@@ -17,15 +17,12 @@ import io.vidocq.runtime.spi.VidocqMain;
  */
 @VidocqMain
 public class McpTimeServerApp implements VidocqApp {
-
-    /** Creates a new instance; invoked reflectively by the runtime inside the Vauban layer. */
-    public McpTimeServerApp() {}
-
     /**
      * Boots the Vidocq runtime.
      *
      * @param args command-line arguments
      */
+    @SuppressWarnings("UnnecessaryModifier") // NEED for vidocq plugin
     public static void main(String[] args) {
         Vidocq.run(McpTimeServerApp.class, args);
     }

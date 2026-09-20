@@ -17,8 +17,8 @@ This repository will grow to host several langchain4j-cdi examples on Vidocq ove
   runtime both refuse to run on an older JDK. Point `JAVA_HOME` at a JDK 25 install for every Maven and `java`
   command below, e.g. `JAVA_HOME=$(sdk home java 25-tem)`.
 - **Maven** (plain `mvn` — this repository has no Maven wrapper and does not want one).
-- **Node.js** (for `npx` and `node`, used only by `test-mcp.sh` and `test-tasks.sh` to run the MCP Inspector CLI
-  and read its JSON).
+- **Node.js 22.19 or newer** (for `npx` and `node`, used only by `test-mcp.sh`, `test-tasks.sh` and `run-inspector.sh`
+  to run the MCP Inspector and read its JSON).
 
 ## Build
 
@@ -255,6 +255,29 @@ back over MCP, the rollback of an all-or-nothing bulk write, validation errors, 
 panel and its password redaction, and the data surviving a restart. `--start` is required, because the checks
 count the seeded tasks of a fresh database and restart the server. `TASKS_URL` and `DEVCONSOLE_PORT` pick other
 ports; it refuses 8080, 8888 and any port already taken, and always stops the server on exit.
+
+## Explore in the MCP Inspector UI
+
+```bash
+./run-inspector.sh
+```
+
+Opens the [MCP Inspector](https://www.npmjs.com/package/@modelcontextprotocol/inspector) web UI (same pinned
+2.6.0 as `test-mcp.sh`), preconfigured for Streamable HTTP on `http://localhost:8080/mcp`. Start the server
+first, from `run.sh` or an IDE: this script does not start it. It sends one MCP request to the endpoint and warns
+if nothing answers, then starts the Inspector anyway, so you can start the server afterwards.
+
+The Inspector prints its URL, with a fresh access token, and opens it in your browser. Switch the server card on
+to connect, then use the **Tools**, **Prompts** and **Resources** tabs. `Ctrl+C` stops the Inspector.
+
+Another server URL, or another UI port:
+
+```bash
+CLIENT_PORT=6280 ./run-inspector.sh http://localhost:8081/mcp
+```
+
+`MCP_AUTO_OPEN_ENABLED=false` keeps the browser closed. The script header lists the other ports the Inspector
+uses.
 
 ## The snapshot dependencies
 
