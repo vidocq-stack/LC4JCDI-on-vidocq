@@ -24,24 +24,15 @@
     </properties>
 
     <dependencies>
-        <!-- langchain4j-cdi's MCP server. -->
-        <dependency>
-            <groupId>dev.langchain4j.cdi.mcp</groupId>
-            <artifactId>langchain4j-cdi-mcp-server</artifactId>
-            <version>${lc4jcdi.version}</version>
-        </dependency>
-
         <!--
-            Optional reflection-free invocation. Adding this artifact is the whole opt-in: its build-compatible
-            extension asks Vauban's InvokerFactory for an invoker per @Tool/@Prompt/@ResourceTemplate method and
-            publishes them as a synthetic McpInvokerProvider bean, which McpBeanInvoker consults before falling
-            back to Method.invoke. run.sh must re-layer this jar into app/ alongside the MCP server, or its
-            BuildCompatibleExtension is invisible to the Vauban child layer (see run.sh for why).
+            The only MCP dependency. The Vidocq extension brings langchain4j-cdi's MCP server and its optional
+            CDI 4.1 invoker, the Jakarta REST runtime that serves /mcp, and a generated vauban-beans.list that
+            indexes the server's beans, so this application declares none of them.
         -->
         <dependency>
-            <groupId>dev.langchain4j.cdi.mcp</groupId>
-            <artifactId>langchain4j-cdi-mcp-invoker-cdi41</artifactId>
-            <version>${lc4jcdi.version}</version>
+            <groupId>io.vidocq.runtime.extensions.essentials</groupId>
+            <artifactId>vidocq-runtime-langchain4j-cdi-mcp-extension</artifactId>
+            <version>${vidocq.version}</version>
         </dependency>
 
         <!-- Vidocq runtime -->
@@ -50,96 +41,6 @@
             <artifactId>vidocq-runtime-core</artifactId>
             <version>${vidocq.version}</version>
         </dependency>
-        <dependency>
-            <groupId>io.vidocq.runtime</groupId>
-            <artifactId>vidocq-runtime-spi</artifactId>
-            <version>${vidocq.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>io.vidocq.runtime.extensions.jakartaee.core</groupId>
-            <artifactId>vidocq-runtime-cassini-rest-extension</artifactId>
-            <version>${vidocq.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>io.vidocq.vauban</groupId>
-            <artifactId>vauban-indexer</artifactId>
-            <version>${vidocq.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>io.vidocq.chappe</groupId>
-            <artifactId>chappe-api</artifactId>
-            <version>${vidocq.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>io.vidocq.chappe</groupId>
-            <artifactId>chappe-core</artifactId>
-            <version>${vidocq.version}</version>
-            <scope>runtime</scope>
-        </dependency>
-
-        <!--
-            Jakarta APIs: Cassini is Jakarta REST 4.0, Vauban is CDI 4.1 Lite, so 4.1.0 (not the jakartaee-bom 10
-            4.0.1 that langchain4j-cdi-mcp-server compiles against) is required here.
-        -->
-        <dependency>
-            <groupId>jakarta.enterprise</groupId>
-            <artifactId>jakarta.enterprise.cdi-api</artifactId>
-            <version>4.1.0</version>
-        </dependency>
-        <dependency>
-            <groupId>jakarta.enterprise</groupId>
-            <artifactId>jakarta.enterprise.lang-model</artifactId>
-            <version>4.1.0</version>
-        </dependency>
-        <dependency>
-            <groupId>jakarta.interceptor</groupId>
-            <artifactId>jakarta.interceptor-api</artifactId>
-            <version>2.2.0</version>
-        </dependency>
-        <!-- io.vidocq.vauban.core requires the jakarta.el module. -->
-        <dependency>
-            <groupId>jakarta.el</groupId>
-            <artifactId>jakarta.el-api</artifactId>
-            <version>6.0.0</version>
-        </dependency>
-        <dependency>
-            <groupId>jakarta.ws.rs</groupId>
-            <artifactId>jakarta.ws.rs-api</artifactId>
-            <version>4.0.0</version>
-        </dependency>
-        <dependency>
-            <groupId>jakarta.inject</groupId>
-            <artifactId>jakarta.inject-api</artifactId>
-            <version>2.0.1</version>
-        </dependency>
-        <dependency>
-            <groupId>jakarta.annotation</groupId>
-            <artifactId>jakarta.annotation-api</artifactId>
-            <version>3.0.0</version>
-        </dependency>
-        <dependency>
-            <groupId>jakarta.json</groupId>
-            <artifactId>jakarta.json-api</artifactId>
-            <version>2.1.3</version>
-        </dependency>
-        <dependency>
-            <groupId>jakarta.json.bind</groupId>
-            <artifactId>jakarta.json.bind-api</artifactId>
-            <version>3.0.1</version>
-        </dependency>
-        <dependency>
-            <groupId>org.eclipse.parsson</groupId>
-            <artifactId>parsson</artifactId>
-            <version>1.1.7</version>
-            <scope>runtime</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.eclipse</groupId>
-            <artifactId>yasson</artifactId>
-            <version>3.0.4</version>
-            <scope>runtime</scope>
-        </dependency>
-
         <!-- Tests -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>
@@ -157,17 +58,6 @@
                 <configuration>
                     <!-- Tool/Prompt/ResourceTemplate argument names are bound by parameter name, not by index. -->
                     <parameters>true</parameters>
-                    <compilerArgs>
-                        <!--
-                            Vauban's build-time bean index is built from the packages a scanned dependency
-                            EXPORTS; the cross-module bean index that actually resolves beans living in a
-                            dependency jar (McpToolRegistry, McpPromptRegistry, McpResourceRegistry and their
-                            transport-package collaborators) is only produced later, by vidocq:generate
-                            (process-classes). Bean-resolution validation therefore has to be deferred to the
-                            runtime container, where it succeeds. Vauban's own warning suggests this flag.
-                        -->
-                        <arg>-Avauban.validation=false</arg>
-                    </compilerArgs>
                     <!--
                         The Vauban and Cassini annotation processors, referenced as the jars that the
                         vidocq-runtime-core-codegen and vidocq-runtime-cassini-rest-extension-codegen aggregates
@@ -199,21 +89,6 @@
                 <groupId>io.vidocq.runtime</groupId>
                 <artifactId>vidocq-runtime-maven-plugin</artifactId>
                 <version>${vidocq.version}</version>
-                <!--
-                    McpEndpoint and the whole MCP server live in a dependency jar that Vauban's APT never saw, so its
-                    CDI beans have to be indexed (and client-proxied) at build time from the outside.
-
-                    Deliberately at plugin level, not on the "generate" execution: a goal run on its own
-                    (`mvn vidocq:generate`, or the "Before launch" step of .run/McpTimeServerApp.run.xml) uses the
-                    default-cli execution, which does not inherit an execution's configuration. It then logs "No
-                    dependencies to process" and indexes nothing — measured. See
-                    https://codefloe.com/Vidocq/vidocq/issues/83
-                -->
-                <configuration>
-                    <scanDependencies>
-                        <scanDependency>dev.langchain4j.cdi.mcp:langchain4j-cdi-mcp-server</scanDependency>
-                    </scanDependencies>
-                </configuration>
                 <executions>
                     <execution>
                         <id>generate</id>

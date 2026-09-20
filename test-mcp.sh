@@ -6,10 +6,11 @@
 #   ./test-mcp.sh [url] [--start]
 #   MCP_URL=http://host:port/mcp ./test-mcp.sh --start
 #
-# --start builds nothing: it starts the already-built server via mcp-time-server/run.sh on the port of
-# MCP_URL, waits until a real MCP initialize request succeeds, runs every check below, and always stops the
-# server on exit (trap), pass or fail. It refuses to start if that port is already taken.
-# Without --start, it tests whatever already serves MCP_URL (run.sh, an IDE, ...), after a pre-flight
+# --start builds nothing: it starts the already-built server through the launcher vidocq:package generates,
+# target/<dist>/bin/mcp-time-server.sh, on the port of MCP_URL, waits until a real MCP initialize request
+# succeeds, runs every check below, and always stops the server on exit (trap), pass or fail. It refuses to
+# start if that port is already taken.
+# Without --start, it tests whatever already serves MCP_URL (that launcher, an IDE, ...), after a pre-flight
 # request that explains a missing or broken endpoint once instead of failing every check.
 #
 # Exits non-zero if any check fails; always prints a PASS/FAIL summary.
@@ -56,7 +57,7 @@ explain_probe_failure() {
     case "$1" in
         000)
             echo "FAIL: nothing is listening at $MCP_URL." >&2
-            echo "      Start the server (mcp-time-server/run.sh), or let this script do it with --start." >&2
+            echo "      Start the server (target/<dist>/bin/mcp-time-server.sh), or let this script do it with --start." >&2
             ;;
         404)
             echo "FAIL: a server answers at $MCP_URL but exposes no MCP endpoint there (HTTP 404)." >&2
@@ -117,14 +118,22 @@ if [ "$START" -eq 1 ]; then
     fi
 
     trap stop_server EXIT
-    RUN_SH="$BASE/mcp-time-server/run.sh"
-    if [ ! -x "$RUN_SH" ]; then
-        echo "FAIL: $RUN_SH not found or not executable." >&2
+    LAUNCHER=$(ls "$BASE"/mcp-time-server/target/mcp-time-server-*/bin/mcp-time-server.sh 2>/dev/null | head -1)
+    if [ -z "$LAUNCHER" ] || [ ! -x "$LAUNCHER" ]; then
+        echo "FAIL: no launcher under mcp-time-server/target/<dist>/bin/." >&2
+        echo "      Run 'mvn package' from the repository root first." >&2
         exit 1
     fi
-    echo "Starting server via $RUN_SH on port $PORT ..."
-    JAVA_OPTS="-Dvidocq.chappe.listener.default.port=$PORT ${JAVA_OPTS:-}" \
-        "$RUN_SH" >"$BASE/mcp-time-server-run.log" 2>&1 &
+    echo "Starting server via $LAUNCHER on port $PORT ..."
+    # The launcher forwards its arguments to the application, not to the JVM, so the port travels through
+    # Vidocq's Environment config source (ordinal 300, above the packaged vidocq.properties).
+    #
+    # It also runs `exec java`, taking whatever java comes first on PATH. Vidocq's jars are class file
+    # version 69, so an older java dies with "Unsupported major.minor version 69.0" before main. JAVA_HOME,
+    # when set, therefore goes on PATH ahead of it.
+    VIDOCQ_CHAPPE_LISTENER_DEFAULT_PORT="$PORT" \
+    PATH="${JAVA_HOME:+$JAVA_HOME/bin:}$PATH" \
+        "$LAUNCHER" >"$BASE/mcp-time-server-run.log" 2>&1 &
     SERVER_PID=$!
 
     echo -n "Waiting for an MCP server at $MCP_URL..."
