@@ -8,11 +8,12 @@
 #   ./test-tasks.sh --start
 #   TASKS_URL=http://127.0.0.1:18093 DEVCONSOLE_PORT=18094 ./test-tasks.sh --start
 #
-# --start is required: the script starts the already-built server itself, through mcp-tasks-server/run.sh,
-# because its checks count the tasks seeded in a fresh database, read the dev console, and restart the server.
-# It builds nothing: run `mvn package` on the module, or `mvn verify` from the repository root, first.
+# --start is required: the script starts the already-built server itself, through the launcher that
+# vidocq:package generates under target/<dist>/bin/, because its checks count the tasks seeded in a fresh
+# database, read the dev console, and restart the server. It builds nothing: run `mvn package` on the module,
+# or `mvn verify` from the repository root, first.
 #
-# The server runs as a dev launch (-Dvidocq.launch.mode=dev, which turns the dev console on). It listens on the port
+# The server runs as a dev launch (VIDOCQ_LAUNCH_MODE=dev, which turns the dev console on). It listens on the port
 # of TASKS_URL, 18093 by default, with the dev console on DEVCONSOLE_PORT, 18094 by default: not the 18090 and 18092
 # of vidocq.properties, so the script can run next to a vidocq:dev session. It uses a database file of its own,
 # mcp-tasks-server/target/h2/e2e-<pid of this script>, deleted on exit. The script refuses to start when either
@@ -43,7 +44,7 @@ done
 
 BASE=$(cd "$(dirname "$0")" && pwd)
 MODULE="$BASE/mcp-tasks-server"
-RUN_SH="$MODULE/run.sh"
+LAUNCHER=""
 LOG="$BASE/mcp-tasks-server-run.log"
 DB_NAME="e2e-$$"
 SERVER_PID=""
@@ -113,12 +114,13 @@ for p in "$PORT" "$DEVC"; do
 done
 
 DIST=$(ls -d "$MODULE"/target/mcp-tasks-server-*/ 2>/dev/null | head -1)
-if [ -z "$DIST" ] || [ ! -x "$RUN_SH" ]; then
-    echo "FAIL: no distribution under $MODULE/target, or $RUN_SH is not executable." >&2
+DIST=${DIST%/}
+LAUNCHER="$DIST/bin/mcp-tasks-server.sh"
+if [ -z "$DIST" ] || [ ! -x "$LAUNCHER" ]; then
+    echo "FAIL: no launcher under $MODULE/target/<dist>/bin/." >&2
     echo "      Run 'mvn package' on mcp-tasks-server (or 'mvn verify' from the repository root) first." >&2
     exit 1
 fi
-DIST=${DIST%/}
 
 # The password the server uses: the one packaged in the application jar, else the one in the sources. Only the
 # number of lines that hold it is ever printed.
@@ -192,13 +194,33 @@ mcp_probe() {
         -d '{"jsonrpc":"2.0","id":0,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"test-tasks.sh","version":"1"}}}'
 }
 
-# Starts run.sh as a dev launch on the script's ports and database file, and waits for a real MCP initialize to
-# answer 200. The caller's JAVA_OPTS come first, so that these -D win.
+# Starts the launcher vidocq:package generates as a dev launch on the script's ports and database file, and
+# waits for a real MCP initialize to answer 200.
+#
+# That launcher forwards its arguments to the application rather than to the JVM, so these settings travel as
+# environment variables, which Vidocq reads as a config source of ordinal 300 — above the packaged
+# vidocq.properties. A caller who needs JVM flags can still pass JAVA_TOOL_OPTIONS, but a -D there becomes a
+# system property, ordinal 400, and would override these.
+#
+# It also runs `exec java`, taking whatever java comes first on PATH, and Vidocq's jars are class file version
+# 69: an older java dies before main (Vidocq/vidocq#102). JAVA_HOME, when set, therefore goes on PATH ahead of
+# it. The subshell enters the module, because the database URL below is relative to it.
 start_server() {
     BOOT_FROM=$(($(wc -l <"$LOG") + 1))
-    echo "Starting server via $RUN_SH (application port $PORT, dev console port $DEVC, database $DB_NAME)..."
-    JAVA_OPTS="${JAVA_OPTS:-} -Dvidocq.launch.mode=dev -Dvidocq.chappe.listener.default.port=$PORT -Dvidocq.devconsole.port=$DEVC -Dvidocq.pool.url=jdbc:h2:file:./target/h2/$DB_NAME;DB_CLOSE_ON_EXIT=FALSE" \
-        "$RUN_SH" >>"$LOG" 2>&1 &
+    echo "Starting server via $LAUNCHER (application port $PORT, dev console port $DEVC, database $DB_NAME)..."
+    #
+    # The subshell execs the launcher, which execs java, so $! below is the JVM itself. Without that exec, $!
+    # is the subshell: the checks that read the server's sockets see none, and stopping it leaves the JVM
+    # holding both ports.
+    (
+        cd "$MODULE" || exit 1
+        export VIDOCQ_LAUNCH_MODE=dev
+        export VIDOCQ_CHAPPE_LISTENER_DEFAULT_PORT="$PORT"
+        export VIDOCQ_DEVCONSOLE_PORT="$DEVC"
+        export VIDOCQ_POOL_URL="jdbc:h2:file:./target/h2/$DB_NAME;DB_CLOSE_ON_EXIT=FALSE"
+        export PATH="${JAVA_HOME:+$JAVA_HOME/bin:}$PATH"
+        exec "$LAUNCHER"
+    ) >>"$LOG" 2>&1 &
     SERVER_PID=$!
 
     echo -n "Waiting for an MCP server at $MCP_URL..."
@@ -330,9 +352,16 @@ CONSOLE_URL=$(boot_log | sed -nE 's#.*Vidocq dev console: (http://127\.0\.0\.1:[
 check "the dev console logged its URL on the configured port, http://127.0.0.1:$DEVC/" \
     "console URL record: ${CONSOLE_URL:-(none)}" "$(ok_if [ "$CONSOLE_URL" = "http://127.0.0.1:$DEVC/" ])"
 
-banner=$(boot_log | grep -E "^ Java .*\| devconsole :$DEVC( |$)")
-check "the banner announces the dev console, devconsole :$DEVC" "$(boot_log | grep -E '^ Java ')" \
-    "$(ok_if [ -n "$banner" ])"
+# The banner's context line is fitted to 80 columns, and what it gives up first, once the application name is
+# there, is the dev console: that segment is a promise made before the bind, while the console's own URL
+# record — the check just above — says where it really listens. Launched through the generated launcher the
+# name is present, so the line reads "Java ... | dev (...) | mcp-tasks-server <version>" and carrying the
+# console too would need 96 columns. What is checked here is therefore the guarantee that holds in every
+# shape: the line fits, and it still names the launch mode, which is what makes the console's absence from it
+# legitimate rather than a console that failed to start.
+banner=$(boot_log | grep -E "^ Java ")
+check "the banner fits 80 columns and names the launch mode" "${banner:-(none)}" \
+    "$(ok_if [ -n "$banner" ] && [ "${#banner}" -le 81 ] && printf '%s' "$banner" | grep -q "| dev (")"
 
 ports=$(listening_ports "$SERVER_PID" | tr '\n' ' ')
 expected=$(printf '%s\n%s\n' "$PORT" "$DEVC" | sort -un | tr '\n' ' ')

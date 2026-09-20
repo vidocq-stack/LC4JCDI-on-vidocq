@@ -23,10 +23,6 @@ open module io.vidocq.tools.lc4jcdi.mcptasks {
     requires dev.langchain4j.cdi.mcp.server;
     requires mcp.server.api;
 
-    // The optional reflection-free invocation module. Required explicitly (this module's beans never reference
-    // it directly) so it is resolved into the Vauban child layer and its BuildCompatibleExtension is
-    // discoverable there, as in mcp-time-server.
-    requires dev.langchain4j.cdi.mcp.invoker.cdi41;
 
     requires io.vidocq.runtime.core;
     requires io.vidocq.runtime.spi;
