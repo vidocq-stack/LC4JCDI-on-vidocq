@@ -35,6 +35,21 @@
             <version>${vidocq.version}</version>
         </dependency>
 
+        <!--
+            The OpenAPI document of the application, served at /openapi, and the Swagger UI at /openapi/ui. The dev
+            console's rest panel offers to open the UI in a new tab.
+        -->
+        <dependency>
+            <groupId>io.vidocq.runtime.extensions.microprofile</groupId>
+            <artifactId>vidocq-runtime-grimm-openapi-extension</artifactId>
+            <version>${vidocq.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.vidocq.runtime.extensions.microprofile</groupId>
+            <artifactId>vidocq-runtime-grimm-openapi-ui-extension</artifactId>
+            <version>${vidocq.version}</version>
+        </dependency>
+
         <!-- Vidocq runtime -->
         <dependency>
             <groupId>io.vidocq.runtime</groupId>

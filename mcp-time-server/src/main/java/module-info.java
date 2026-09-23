@@ -10,6 +10,10 @@ open module io.vidocq.tools.lc4jcdi.mcptimeserver {
     // The application compiles against the MCP server's annotations and types; mcp.server.api comes with it.
     requires dev.langchain4j.cdi.mcp.server;
 
+    // OpenAPI document (/openapi) and Swagger UI (/openapi/ui).
+    requires io.vidocq.runtime.extensions.microprofile.grimm.openapi;
+    requires io.vidocq.runtime.extensions.microprofile.grimm.openapi.ui;
+
     // Vidocq.run instantiates the @VidocqMain trampoline reflectively.
     exports io.vidocq.tools.lc4jcdi.mcptimeserver;
 }
