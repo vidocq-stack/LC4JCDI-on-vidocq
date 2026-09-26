@@ -130,24 +130,6 @@
             <version>${vidocq.version}</version>
         </dependency>
 
-        <!--
-            The dev console: a read-only page on a loopback listener of its own (vidocq.devconsole.port, 18092 in
-            vidocq.properties), on in a dev launch only (vidocq:dev, an IDE, -Dvidocq.launch.mode=dev). Its
-            "Mansart pools" tab shows this application's @Default pool live: active and idle connections out of
-            maxSize, borrows per second, the password as "configured" only. An ordinary dependency: no codegen
-            bundle, no requires in module-info.
-
-            It comes, for now, from a LOCAL install of Vidocq (branch feat/91-devconsole-slice1): the snapshots
-            repository has neither this artifact nor a pool extension that feeds its panel (README.md, "The
-            snapshot dependencies"). Build with -nsu, so that a newer remote pool extension without the panel
-            never replaces the local one.
-        -->
-        <dependency>
-            <groupId>io.vidocq.runtime.extensions.essentials</groupId>
-            <artifactId>vidocq-runtime-devconsole-extension</artifactId>
-            <version>${vidocq.version}</version>
-        </dependency>
-
         <!-- Tests -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>

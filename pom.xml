@@ -101,10 +101,13 @@
         </dependencies>
     </dependencyManagement>
     <dependencies>
-
+        <!--
+            Both servers listen over HTTP. mvn vidocq:dev adds the dev console by itself when this extension is
+            present, and never packages it (Vidocq/vidocq#143).
+        -->
         <dependency>
             <groupId>io.vidocq.runtime.extensions.essentials</groupId>
-            <artifactId>vidocq-runtime-devconsole-extension</artifactId>
+            <artifactId>vidocq-runtime-chappe-webserver-extension</artifactId>
             <version>${vidocq.version}</version>
         </dependency>
     </dependencies>

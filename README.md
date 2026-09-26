@@ -29,8 +29,8 @@ mvn -nsu -B clean verify
 
 This compiles every module, runs the unit tests (plain JUnit, no container), and produces a runnable
 distribution for each server: `mcp-time-server/target/mcp-time-server-<version>/` and
-`mcp-tasks-server/target/mcp-tasks-server-<version>/`. `-nsu` keeps the local install of the Vidocq dev console
-from being replaced (see "The snapshot dependencies").
+`mcp-tasks-server/target/mcp-tasks-server-<version>/`. `-nsu` keeps a local install of Vidocq from being
+replaced by an older snapshot (see "The snapshot dependencies").
 
 On an older JDK, the build fails fast with a clear sentence instead of the compiler's opaque
 `release version 25 not supported`, thanks to a `maven-enforcer-plugin` `requireJavaVersion` rule in the root
@@ -298,19 +298,11 @@ POM with snapshots enabled and releases disabled — once under `<repositories>`
 under `<pluginRepositories>`, because Maven resolves `vidocq-runtime-maven-plugin` from plugin repositories only.
 No `settings.xml` change is needed.
 
-**Except, for now, the dev console of `mcp-tasks-server`.**
-`io.vidocq.runtime.extensions.essentials:vidocq-runtime-devconsole-extension` and `vidocq-runtime-devconsole-spi`
-are not published yet. They come from a local install of Vidocq, branch `feat/91-devconsole-slice1` (`mvn install`
-in that checkout), which also installs the pool extension that feeds the console's *Mansart pools* panel, and the
-`vidocq-runtime-maven-plugin` that forwards `-Dvidocq.*` from `vidocq:dev` to the application. Without that install,
-the build of `mcp-tasks-server` cannot resolve the console. Build with `-nsu` (`--no-snapshot-updates`): the
-snapshots repository has builds of the pool extension and of the plugin too, older than the local install today,
-and a newer one deployed there from a branch without the console would replace the local ones without a word,
-taking the panel and the `-D` forwarding away. The pool extension a build used must require the console's SPI:
-
-```bash
-jar --describe-module --file mcp-tasks-server/target/mcp-tasks-server-*/lib/vidocq-runtime-mansart-pool-extension-*.jar | grep devconsole
-```
+**The dev console is not a dependency.** Neither server declares it: `mvn vidocq:dev` adds the console, with the
+live panel module of each Vidocq extension in use, because both servers have
+`vidocq-runtime-chappe-webserver-extension`. The distributions never contain it (Vidocq/vidocq#143). Build with
+`-nsu` (`--no-snapshot-updates`) when you test a local install of Vidocq: a snapshot deployed to the repository
+later than your install would replace it without a word.
 
 ## Workarounds
 
