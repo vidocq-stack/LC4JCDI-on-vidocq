@@ -1,5 +1,5 @@
 /**
- * The MCP tasks server example: a task tracker on an H2 file database, hosted on the Vidocq runtime.
+ * The MCP tasks server example: a task tracker on PostgreSQL, hosted on the Vidocq runtime.
  *
  * <p>Open, so that Vauban, Cassini, JSON-B, Flyway and the MCP server's reflective invoker can reach its
  * classes and resources. Being open, it needs no {@code opens} clause: {@code db.migration} is open too.

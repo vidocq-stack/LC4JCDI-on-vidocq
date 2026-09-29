@@ -1,7 +1,7 @@
 #!/bin/bash
 # End-to-end check of the mcp-tasks-server example: the Cassini REST API that writes the tasks, the MCP server that
 # reads them (through the MCP Inspector CLI, @modelcontextprotocol/inspector 2.6.0, run via `npx -y`), the Mansart
-# transaction that makes a bulk write all or nothing, the dev console's pool panel, and the H2 file database
+# transaction that makes a bulk write all or nothing, the dev console's pool panel, and the PostgreSQL database
 # surviving a restart.
 #
 # Usage:
@@ -15,8 +15,9 @@
 #
 # The server runs as a dev launch (VIDOCQ_LAUNCH_MODE=dev, which turns the dev console on). It listens on the port
 # of TASKS_URL, 18093 by default, with the dev console on DEVCONSOLE_PORT, 18094 by default: not the 18090 and 18092
-# of vidocq.properties, so the script can run next to a vidocq:dev session. It uses a database file of its own,
-# mcp-tasks-server/target/h2/e2e-<pid of this script>, deleted on exit. The script refuses to start when either
+# of vidocq.properties, so the script can run next to a vidocq:dev session. It uses a PostgreSQL database of its own,
+# a Docker container named mcp-tasks-e2e-<pid of this script> (postgres:16-alpine, the dev service's image) on a free
+# loopback port, removed on exit; the launcher runs no dev service. The script refuses to start when either
 # port is taken, stops the server at once if its log mentions port 8080 or 8888, and always stops it on exit
 # (trap), pass or fail. The server log is mcp-tasks-server-run.log, next to this script.
 #
@@ -46,7 +47,9 @@ BASE=$(cd "$(dirname "$0")" && pwd)
 MODULE="$BASE/mcp-tasks-server"
 LAUNCHER=""
 LOG="$BASE/mcp-tasks-server-run.log"
-DB_NAME="e2e-$$"
+PG_CONTAINER="mcp-tasks-e2e-$$"
+PG_IMAGE="postgres:16-alpine"
+PG_PORT=""
 SERVER_PID=""
 WORK=""
 
@@ -59,9 +62,10 @@ fi
 
 # --- Prerequisites -----------------------------------------------------------------------------
 
-for tool in npx node curl lsof; do
+for tool in npx node curl lsof docker; do
     if ! command -v "$tool" >/dev/null 2>&1; then
-        echo "FAIL: $tool not found on PATH (npx and node come with Node.js, for the MCP Inspector CLI)." >&2
+        echo "FAIL: $tool not found on PATH (npx and node come with Node.js, for the MCP Inspector CLI; docker runs" >&2
+        echo "      the PostgreSQL database)." >&2
         exit 1
     fi
 done
@@ -141,6 +145,29 @@ fi
 
 WORK=$(mktemp -d "${TMPDIR:-/tmp}/test-tasks.XXXXXX")
 
+# The database: a PostgreSQL container of this run, with the user, database and password of vidocq.properties, on a
+# free loopback port. Ready once it accepts TCP connections: during its first start the image runs a temporary
+# server on its Unix socket only, then restarts.
+start_database() {
+    local user db
+    user=$(sed -n 's/^vidocq\.pool\.username=//p' "$MODULE/src/main/resources/vidocq.properties" | tr -d '\r')
+    db=$(sed -n 's|^vidocq\.pool\.url=jdbc:postgresql://[^/]*/\([A-Za-z0-9_]*\).*|\1|p' \
+        "$MODULE/src/main/resources/vidocq.properties" | tr -d '\r')
+    echo "Starting PostgreSQL ($PG_IMAGE, container $PG_CONTAINER)..."
+    if ! docker run -d --rm --name "$PG_CONTAINER" -p 127.0.0.1::5432 -e POSTGRES_USER="${user:-tasks}" \
+            -e POSTGRES_DB="${db:-tasks}" -e POSTGRES_PASSWORD="$PW" "$PG_IMAGE" >/dev/null; then
+        echo "FAIL: docker could not start $PG_IMAGE." >&2
+        exit 1
+    fi
+    PG_PORT=$(docker port "$PG_CONTAINER" 5432/tcp | head -1 | sed 's/.*://')
+    for _ in $(seq 1 60); do
+        docker exec "$PG_CONTAINER" pg_isready -q -h 127.0.0.1 -U "${user:-tasks}" -d "${db:-tasks}" && return 0
+        sleep 1
+    done
+    echo "FAIL: PostgreSQL did not accept connections within 60 s." >&2
+    exit 1
+}
+
 stop_server() {
     if [ -n "$SERVER_PID" ] && kill -0 "$SERVER_PID" 2>/dev/null; then
         echo "Stopping server (pid $SERVER_PID)..."
@@ -156,10 +183,13 @@ stop_server() {
 
 cleanup() {
     stop_server
-    rm -f "$MODULE/target/h2/$DB_NAME".*
+    docker rm -f "$PG_CONTAINER" >/dev/null 2>&1
     [ -n "$WORK" ] && rm -rf "$WORK"
 }
 trap cleanup EXIT
+start_database
+DB_URL="jdbc:postgresql://127.0.0.1:$PG_PORT/$(sed -n 's|^vidocq\.pool\.url=jdbc:postgresql://[^/]*/\([A-Za-z0-9_]*\).*|\1|p' \
+    "$MODULE/src/main/resources/vidocq.properties" | tr -d '\r')"
 
 # The log of the running boot only: BOOT_FROM is its first line in $LOG.
 BOOT_FROM=1
@@ -204,10 +234,10 @@ mcp_probe() {
 #
 # It also runs `exec java`, taking whatever java comes first on PATH, and Vidocq's jars are class file version
 # 69: an older java dies before main (Vidocq/vidocq#102). JAVA_HOME, when set, therefore goes on PATH ahead of
-# it. The subshell enters the module, because the database URL below is relative to it.
+# it. The subshell enters the module, where the server's relative paths start.
 start_server() {
     BOOT_FROM=$(($(wc -l <"$LOG") + 1))
-    echo "Starting server via $LAUNCHER (application port $PORT, dev console port $DEVC, database $DB_NAME)..."
+    echo "Starting server via $LAUNCHER (application port $PORT, dev console port $DEVC, database on port $PG_PORT)..."
     #
     # The subshell execs the launcher, which execs java, so $! below is the JVM itself. Without that exec, $!
     # is the subshell: the checks that read the server's sockets see none, and stopping it leaves the JVM
@@ -217,7 +247,7 @@ start_server() {
         export VIDOCQ_LAUNCH_MODE=dev
         export VIDOCQ_CHAPPE_LISTENER_DEFAULT_PORT="$PORT"
         export VIDOCQ_DEVCONSOLE_PORT="$DEVC"
-        export VIDOCQ_POOL_URL="jdbc:h2:file:./target/h2/$DB_NAME;DB_CLOSE_ON_EXIT=FALSE"
+        export VIDOCQ_POOL_URL="$DB_URL"
         export PATH="${JAVA_HOME:+$JAVA_HOME/bin:}$PATH"
         exec "$LAUNCHER"
     ) >>"$LOG" 2>&1 &
@@ -365,7 +395,7 @@ check "the banner fits 80 columns and names the launch mode" "${banner:-(none)}"
 
 ports=$(listening_ports "$SERVER_PID" | tr '\n' ' ')
 expected=$(printf '%s\n%s\n' "$PORT" "$DEVC" | sort -un | tr '\n' ' ')
-check "the server listens on ports $PORT and $DEVC and nothing else (no debugger, no H2 server)" \
+check "the server listens on ports $PORT and $DEVC and nothing else (no debugger)" \
     "listening: ${ports:-(none)}" "$(ok_if [ "$ports" = "$expected" ])"
 
 # 1. The MCP surface.

@@ -11,8 +11,8 @@ import io.vidocq.runtime.spi.VidocqMain;
  * because the runtime re-resolves the application into a child module layer defined by the Vauban class loader
  * (client-proxy weaving happens at class definition time) and only then calls {@link #run} inside that layer.
  *
- * <p>Before the container starts, the migration extension applies {@code db/migration} to the H2 database named
- * by {@code vidocq.pool.url}; the Mansart pool then serves it as the {@code @Default} {@code DataSource}. The
+ * <p>Before the container starts, the migration extension applies {@code db/migration} to the PostgreSQL database named
+ * by {@code vidocq.pool.url} (a dev service container under {@code vidocq:dev}); the Mansart pool then serves it as the {@code @Default} {@code DataSource}. The
  * server listens on {@code http://127.0.0.1:18090} ({@code vidocq.properties}).
  */
 @VidocqMain

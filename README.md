@@ -9,7 +9,7 @@ This repository will grow to host several langchain4j-cdi examples on Vidocq ove
 | Module | What it shows |
 |---|---|
 | [`mcp-time-server`](mcp-time-server) | langchain4j-cdi's **MCP server** (tools, a resource template, a prompt) running on Vidocq, including reflection-free method invocation via `langchain4j-cdi-mcp-invoker-cdi41` |
-| [`mcp-tasks-server`](mcp-tasks-server) | A task tracker on an **H2** file database: a **Cassini REST** API writes the tasks through a **Mansart** pool, Jakarta Data repositories and `@Transactional` services, and langchain4j-cdi's **MCP server** reads them; Flyway migrations and the Vidocq **dev console** |
+| [`mcp-tasks-server`](mcp-tasks-server) | A task tracker on **PostgreSQL** (a dev service container under `vidocq:dev`): a **Cassini REST** API writes the tasks through a **Mansart** pool, Jakarta Data repositories and `@Transactional` services, and langchain4j-cdi's **MCP server** reads them; Flyway migrations and the Vidocq **dev console** |
 
 ## Prerequisites
 
@@ -100,7 +100,7 @@ three things, which nobody has seen it do inside IntelliJ yet (see "Not verified
    `scanDependencies` is configured at plugin level in `mcp-time-server/pom.xml`.
 
 The tasks server has its own shared configuration, **`McpTasksServerApp`** (`.run/McpTasksServerApp.run.xml`), set up
-the same way. It also starts the JVM in `mcp-tasks-server/`, where its H2 database file is, and passes
+the same way. It also starts the JVM in `mcp-tasks-server/`, needs the local PostgreSQL its README describes, and passes
 `--add-modules ALL-MODULE-PATH`. Its *Before launch* `vidocq:generate` step indexes the MCP server jar, but cannot
 repair that module's own bean index; [its README](mcp-tasks-server/README.md#running-from-an-ide) says why, and what
 was measured.
@@ -360,7 +360,7 @@ Four small, self-contained examples of the MCP server's feature surface, all abo
 
 ### `mcp-tasks-server`
 
-A task tracker on H2: Mansart pool, Jakarta Data repositories and transactions behind a Cassini REST API that
+A task tracker on PostgreSQL: Mansart pool, Jakarta Data repositories and transactions behind a Cassini REST API that
 writes, four MCP tools, two resources and two prompts that read, Flyway migrations, and the dev console — see
 [`mcp-tasks-server/README.md`](mcp-tasks-server/README.md).
 

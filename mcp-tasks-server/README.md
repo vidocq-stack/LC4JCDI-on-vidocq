@@ -1,13 +1,13 @@
 # mcp-tasks-server
 
-A task tracker hosted on Vidocq: a REST API writes the tasks to an H2 database, and a langchain4j-cdi
+A task tracker hosted on Vidocq: a REST API writes the tasks to a PostgreSQL database, and a langchain4j-cdi
 [MCP server](../README.md) lets an assistant read them. Each task has a title, a description, a project, a status
 (open or done), a priority, a due date and timestamps, and every change leaves an event in its history. The code
 lives under `src/main/java/io/vidocq/tools/lc4jcdi/mcptasks/`.
 
 | Piece | What it does here |
 |---|---|
-| **Mansart pool** | The `@Default` `DataSource`: a connection pool on an H2 database *file*, configured by `vidocq.pool.*` in `vidocq.properties`. |
+| **Mansart pool** | The `@Default` `DataSource`: a connection pool on a PostgreSQL database, configured by `vidocq.pool.*` in `vidocq.properties`; under `vidocq:dev`, a container the PostgreSQL dev service starts. |
 | **Mansart Data** | `TaskRepository` and `TaskEventRepository`, Jakarta Data interfaces whose implementations Mansart generates at compile time: derived queries (`findByStatusOrderByDueDateAsc`), a JDQL `LOWER … LIKE` search, and a set-based JDQL `UPDATE` that renames a project. |
 | **Mansart transactions** | `TaskService`, whose public methods are `@Transactional`: a task row and its history event commit together, and completing several tasks at once is all or nothing. |
 | **Flyway** | Creates the two tables and seeds eight tasks at boot (`src/main/resources/db/migration`). |
@@ -23,7 +23,7 @@ MCP client ──> /mcp: tools, resources, prompts ──> TaskQueries ───
                                      TaskRepository, TaskEventRepository (Mansart Data)
                                                                       │
                                                                       v
-                                     Mansart pool (@Default DataSource) ──> H2 file target/h2/tasks.mv.db
+                                     Mansart pool (@Default DataSource) ──> PostgreSQL (a dev service container under vidocq:dev)
 ```
 
 `TaskRules` holds every validation and ordering rule and `TaskPromptText` builds the prompt texts. Neither has a CDI
@@ -44,22 +44,30 @@ otherwise. Keep it there: whoever can reach a debugger can run any code in the J
 
 Not 8080 and 8888, the defaults of the listener and of the console, so this module runs next to
 `mcp-time-server` or another server on 8080. The listener is bound on `127.0.0.1` only, because the REST API writes
-to the database without authentication. H2 opens no port: the URL has no `AUTO_SERVER`, and no H2 console or TCP
-server is started.
+to the database without authentication. The JVM opens no database port: PostgreSQL runs in its own process (a
+container under `vidocq:dev`, on a port Docker picks and binds to the loopback address).
 
 ## The data
 
-The database is the file `mcp-tasks-server/target/h2/tasks.mv.db`. `vidocq:dev` and `run.sh` both start the JVM in
-the module directory, so `./target/h2/tasks` in `vidocq.pool.url` names the same file in both launches. It
-survives a `vidocq:dev` reload and a restart, and `mvn clean` deletes it. To start again from the seed data:
+PostgreSQL, through the `mansart-data-dialect-postgresql` dialect and the `org.postgresql` driver.
+
+- **Under `vidocq:dev`** the PostgreSQL dev service (`vidocq-runtime-devservice-postgres`, a dependency of the
+  Vidocq Maven plugin in `pom.xml`) starts a `postgres:16-alpine` container before the application and hands it the
+  URL, user and password. The `vidocq.pool.url` of `vidocq.properties` is the production URL and never switches the
+  dev service off; `-Dvidocq.pool.url=...` (or `VIDOCQ_POOL_URL`) does, to use a database of your own. The container
+  is new at each `vidocq:dev`, so each session starts from the seed data; `vidocq.dev.reuse=true` keeps it across
+  sessions, and `vidocq.dev.postgres.port` pins its port. The dev console's *Dev services* tab shows it.
+- **`run.sh` and an IDE launch** run no dev service: they use `vidocq.pool.url`, `jdbc:postgresql://localhost:5432/tasks`,
+  with the user and password of `vidocq.properties`. For a local one:
 
 ```bash
-rm -rf mcp-tasks-server/target/h2
+docker run -d --name mcp-tasks-db -p 127.0.0.1:5432:5432 -e POSTGRES_DB=tasks -e POSTGRES_USER=tasks \
+    -e POSTGRES_PASSWORD="$(sed -n 's/^vidocq.pool.password=//p' src/main/resources/vidocq.properties)" postgres:16-alpine
 ```
 
 The seed's dates are relative to the day the database is created: on that day, "Review the dev console redaction
-rules" is two days overdue and "Merge the MRTR batch pull request" is due today. H2 stores the user and password
-of `vidocq.properties` when it creates the database, so after changing them, delete `target/h2` as well.
+rules" is two days overdue and "Merge the MRTR batch pull request" is due today. The migrations are plain SQL that
+both PostgreSQL and H2 run: the unit tests apply them to an in-memory H2.
 
 ## Build and run
 
@@ -79,7 +87,7 @@ Run the distribution:
 cd mcp-tasks-server && ./run.sh
 ```
 
-The server listens on `http://127.0.0.1:18090`.
+The server listens on `http://127.0.0.1:18090`, on the PostgreSQL of `vidocq.pool.url` (see [The data](#the-data)).
 
 Or run it in dev mode, which recompiles and reloads on every change:
 
@@ -235,17 +243,17 @@ mvn -nsu -B verify -pl mcp-tasks-server -am     # from the repository root
   REST resources and the MCP beans called directly on the seeded database; `McpResults`, `TaskJson` and
   `TaskPromptText`.
 - **`../test-tasks.sh --start`** boots the packaged server through `run.sh`, as a dev launch on ports 18093 and
-  18094 and a database file of its own, and checks it from the outside with `curl` and the MCP Inspector CLI: the
+  18094 and a PostgreSQL container of its own (Docker), and checks it from the outside with `curl` and the MCP Inspector CLI: the
   ports it listens on and nothing else, the MCP surface, a REST write read back over MCP, the all-or-nothing
   rollback, validation errors without stack traces, a prompt, the dev console's pool panel and its password
-  redaction, and the data surviving a restart. It deletes its database file and stops the server on exit, pass or
+  redaction, and the data surviving a restart. It removes its container and stops the server on exit, pass or
   fail. `TASKS_URL` and `DEVCONSOLE_PORT` choose other ports; it never uses 8080 or 8888.
 
 ## Running from an IDE
 
 Run or debug the shared `McpTasksServerApp` configuration: `.run/McpTasksServerApp.run.xml` at the repository root
-for IntelliJ IDEA, `McpTasksServerApp.launch` in this directory for Eclipse. Both start the JVM in this directory,
-where `./target/h2/tasks` is, and pass `--add-modules ALL-MODULE-PATH`.
+for IntelliJ IDEA, `McpTasksServerApp.launch` in this directory for Eclipse. Both start the JVM in this directory and
+pass `--add-modules ALL-MODULE-PATH`; like `run.sh`, they need the PostgreSQL of [The data](#the-data).
 
 That option was measured from a terminal, with the IDE-style launch of the
 [root README](../README.md#running-from-an-ide) (`java -p target/classes:<runtime jars> -m ...`, after

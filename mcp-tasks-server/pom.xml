@@ -12,7 +12,7 @@
     <packaging>jar</packaging>
 
     <name>LC4JCDI on Vidocq: MCP Tasks Server</name>
-    <description>A task tracker on an H2 file database: Mansart pool, Mansart Data repositories and Mansart
+    <description>A task tracker on PostgreSQL: Mansart pool, Mansart Data repositories and Mansart
         transactions behind a Cassini REST API that writes, and a langchain4j-cdi MCP server that reads. Hosted on
         the Vidocq runtime suite (Vauban CDI 4.1 Lite + Cassini Jakarta REST + Chappe HTTP). Requires JDK 25, which
         the Vidocq 0.4.0-SNAPSHOT artifacts and Maven plugin are compiled for (class file version 69).</description>
@@ -93,19 +93,34 @@
             <artifactId>vidocq-runtime-mansart-transactions-extension</artifactId>
             <version>${vidocq.version}</version>
         </dependency>
-        <!-- The SQL dialect, found through ServiceLoader. -->
+        <!--
+            PostgreSQL: the SQL dialect, found through ServiceLoader and picked from the database's product name,
+            and the JDBC driver. Under vidocq:dev the PostgreSQL dev service starts the database in a container.
+        -->
+        <dependency>
+            <groupId>io.vidocq.mansart</groupId>
+            <artifactId>mansart-data-dialect-postgresql</artifactId>
+            <version>${vidocq.version}</version>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <version>42.7.10</version>
+            <scope>runtime</scope>
+        </dependency>
+        <!-- The unit tests run on an in-memory H2 database (TasksDatabase): no Docker needed to build. -->
         <dependency>
             <groupId>io.vidocq.mansart</groupId>
             <artifactId>mansart-data-dialect-h2</artifactId>
             <version>${vidocq.version}</version>
-            <scope>runtime</scope>
+            <scope>test</scope>
         </dependency>
-        <!-- The JDBC driver; also on the test class path for TaskRepositoryTest. -->
         <dependency>
             <groupId>com.h2database</groupId>
             <artifactId>h2</artifactId>
             <version>2.3.232</version>
-            <scope>runtime</scope>
+            <scope>test</scope>
         </dependency>
         <!-- @Entity, @Table, @Column... : annotations only, Mansart is the implementation. -->
         <dependency>
@@ -192,6 +207,18 @@
                 <groupId>io.vidocq.runtime</groupId>
                 <artifactId>vidocq-runtime-maven-plugin</artifactId>
                 <version>${vidocq.version}</version>
+                <!--
+                    The PostgreSQL dev service, on the plugin's class path only: vidocq:dev starts a PostgreSQL
+                    container unless vidocq.pool.url is given as -D, an environment variable or goal configuration.
+                    The URL of vidocq.properties, the production one, never switches it off.
+                -->
+                <dependencies>
+                    <dependency>
+                        <groupId>io.vidocq.runtime</groupId>
+                        <artifactId>vidocq-runtime-devservice-postgres</artifactId>
+                        <version>${vidocq.version}</version>
+                    </dependency>
+                </dependencies>
                 <executions>
                     <execution>
                         <id>generate</id>
