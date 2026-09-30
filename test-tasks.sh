@@ -1,8 +1,8 @@
 #!/bin/bash
 # End-to-end check of the mcp-tasks-server example: the Cassini REST API that writes the tasks, the MCP server that
 # reads them (through the MCP Inspector CLI, @modelcontextprotocol/inspector 2.6.0, run via `npx -y`), the Mansart
-# transaction that makes a bulk write all or nothing, the dev console's pool panel, and the PostgreSQL database
-# surviving a restart.
+# transaction that makes a bulk write all or nothing, the PostgreSQL database surviving a restart, and the packaged
+# distribution holding no dev console.
 #
 # Usage:
 #   ./test-tasks.sh --start
@@ -10,12 +10,15 @@
 #
 # --start is required: the script starts the already-built server itself, through the launcher that
 # vidocq:package generates under target/<dist>/bin/, because its checks count the tasks seeded in a fresh
-# database, read the dev console, and restart the server. It builds nothing: run `mvn package` on the module,
+# database, check the dev console's absence, and restart the server. It builds nothing: run `mvn package` on the module,
 # or `mvn verify` from the repository root, first.
 #
-# The server runs as a dev launch (VIDOCQ_LAUNCH_MODE=dev, which turns the dev console on). It listens on the port
-# of TASKS_URL, 18093 by default, with the dev console on DEVCONSOLE_PORT, 18094 by default: not the 18090 and 18092
-# of vidocq.properties, so the script can run next to a vidocq:dev session. It uses a PostgreSQL database of its own,
+# The server runs as a dev launch (VIDOCQ_LAUNCH_MODE=dev), with the dev console asked for on DEVCONSOLE_PORT, 18094
+# by default: since Vidocq/vidocq#143 the packaged distribution drops every dev-only jar, the console included, so
+# the checks prove it is absent — no console line, nothing on that port — even in a dev launch. The console's
+# panels are covered by Vidocq's own tests and under vidocq:dev. The application listens on the port of TASKS_URL,
+# 18093 by default: not the 18090 and 18092 of vidocq.properties, so the script can run next to a vidocq:dev
+# session. It uses a PostgreSQL database of its own,
 # a Docker container named mcp-tasks-e2e-<pid of this script> (postgres:16-alpine, the dev service's image) on a free
 # loopback port, removed on exit; the launcher runs no dev service. The script refuses to start when either
 # port is taken, stops the server at once if its log mentions port 8080 or 8888, and always stops it on exit
@@ -378,13 +381,14 @@ listener=$(boot_log | grep -F "Chappe listener 'default' started on http://127.0
 check "the application listener started on http://127.0.0.1:$PORT/" "$(boot_log | grep -F 'Chappe listener')" \
     "$(ok_if [ -n "$listener" ])"
 
-CONSOLE_URL=$(boot_log | sed -nE 's#.*Vidocq dev console: (http://127\.0\.0\.1:[0-9]+/)$#\1#p' | tail -1)
-check "the dev console logged its URL on the configured port, http://127.0.0.1:$DEVC/" \
-    "console URL record: ${CONSOLE_URL:-(none)}" "$(ok_if [ "$CONSOLE_URL" = "http://127.0.0.1:$DEVC/" ])"
+# The packaged distribution holds no dev console (Vidocq/vidocq#143), even in a dev launch: no console record.
+CONSOLE_LINE=$(boot_log | grep -F "Vidocq dev console:" | tail -1)
+check "the packaged distribution starts no dev console, even in a dev launch" \
+    "console record: ${CONSOLE_LINE:-(none)}" "$(ok_if [ -z "$CONSOLE_LINE" ])"
 
 # The banner's context line is fitted to 80 columns, and what it gives up first, once the application name is
-# there, is the dev console: that segment is a promise made before the bind, while the console's own URL
-# record — the check just above — says where it really listens. Launched through the generated launcher the
+# there, is the dev console: that segment is a promise made before the bind, and the packaged distribution has no
+# console anyway (the check just above). Launched through the generated launcher the
 # name is present, so the line reads "Java ... | dev (...) | mcp-tasks-server <version>" and carrying the
 # console too would need 96 columns. What is checked here is therefore the guarantee that holds in every
 # shape: the line fits, and it still names the launch mode, which is what makes the console's absence from it
@@ -394,8 +398,8 @@ check "the banner fits 80 columns and names the launch mode" "${banner:-(none)}"
     "$(ok_if [ -n "$banner" ] && [ "${#banner}" -le 81 ] && printf '%s' "$banner" | grep -q "| dev (")"
 
 ports=$(listening_ports "$SERVER_PID" | tr '\n' ' ')
-expected=$(printf '%s\n%s\n' "$PORT" "$DEVC" | sort -un | tr '\n' ' ')
-check "the server listens on ports $PORT and $DEVC and nothing else (no debugger)" \
+expected="$PORT "
+check "the server listens on port $PORT and nothing else (no dev console, no debugger)" \
     "listening: ${ports:-(none)}" "$(ok_if [ "$ports" = "$expected" ])"
 
 # 1. The MCP surface.
@@ -514,18 +518,9 @@ out=$(inspector --method prompts/get --prompt-name plan_my_day)
 v=$(printf '%s' "$out" | json 'j.messages[0].content.text.includes("Merge the MRTR batch pull request")')
 check "prompts/get plan_my_day mentions \"Merge the MRTR batch pull request\"" "$out" "$(ok_if is_true "$v")"
 
-# 10. The dev console: the pool panel, live, and never the password.
-SNAPSHOT="$WORK/snapshot.json"
-status=$(curl -s -m 10 -o "$SNAPSHOT" -w '%{http_code}' "${CONSOLE_URL:-http://127.0.0.1:$DEVC/}api/snapshot")
-v=$(json '(g => g.name + "|" + g.values.find(x => x.key === "active").max + "|" + (g.values.find(x => x.key === "borrows").value > 0))((p => p.sample.groups.length === 1 && p.sample.groups[0])(j.panels.find(p => p.id === "mansart-pool")))' <"$SNAPSHOT")
-check "the dev console's mansart-pool panel shows one @Default pool, max 8 active, borrows counted" \
-    "HTTP $status; panel summary: ${v:-(no such panel)}" "$(ok_if [ "$status|$v" = "200|@Default|8|true" ])"
-
-v=$(json 'j.panels.find(p => p.id === "mansart-pool").lines.some(l => l[0] === "@Default password" && l[1] === "configured")' <"$SNAPSHOT")
-pw_snapshot=$(grep -cF -- "$PW" "$SNAPSHOT")
-check "the dev console shows the password as 'configured', and its snapshot never holds it" \
-    "'@Default password' row reads configured: ${v:-false}; lines of the snapshot holding the password: $pw_snapshot" \
-    "$(ok_if is_true "$v" && [ "$pw_snapshot" = "0" ])"
+# 10. No dev console: nothing answers on the port it was asked for.
+status=$(curl -s -m 5 -o /dev/null -w '%{http_code}' "http://127.0.0.1:$DEVC/api/snapshot")
+check "nothing answers on the dev console port $DEVC" "HTTP ${status:-000}" "$(ok_if [ "$status" = "000" ])"
 
 # 11. Persistence: a task written before a restart is still there after it, and nothing is migrated again.
 rest POST /tasks "{\"title\":\"E2E kept $NONCE\",\"project\":\"e2e\"}"

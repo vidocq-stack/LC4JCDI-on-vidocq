@@ -245,8 +245,9 @@ mvn -nsu -B verify -pl mcp-tasks-server -am     # from the repository root
 - **`../test-tasks.sh --start`** boots the packaged server through `run.sh`, as a dev launch on ports 18093 and
   18094 and a PostgreSQL container of its own (Docker), and checks it from the outside with `curl` and the MCP Inspector CLI: the
   ports it listens on and nothing else, the MCP surface, a REST write read back over MCP, the all-or-nothing
-  rollback, validation errors without stack traces, a prompt, the dev console's pool panel and its password
-  redaction, and the data surviving a restart. It removes its container and stops the server on exit, pass or
+  rollback, validation errors without stack traces, a prompt, the absence of any dev console in the packaged
+  distribution (Vidocq/vidocq#143: dev-only jars are dropped, even for a dev launch), the password never logged,
+  and the data surviving a restart. The console's pool panel is seen under `vidocq:dev`. It removes its container and stops the server on exit, pass or
   fail. `TASKS_URL` and `DEVCONSOLE_PORT` choose other ports; it never uses 8080 or 8888.
 
 ## Running from an IDE
