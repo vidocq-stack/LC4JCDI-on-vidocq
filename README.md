@@ -281,19 +281,18 @@ uses.
 
 ## The snapshot dependencies
 
-`langchain4j-cdi-mcp-server` and `langchain4j-cdi-mcp-invoker-cdi41` are pinned, in one place
-(`lc4jcdi.version` in the root POM), to `dev.langchain4j.cdi.mcp:*:1.4.0-SNAPSHOT` — **not** the `1.4.0` release.
-The release predates the MCP `2026-07-28` protocol support (tool annotations, resource templates, MRTR) these
-examples exercise, even though its version string sorts higher than the snapshot's. Move `lc4jcdi.version` to a
-release coordinate once langchain4j-cdi publishes one that contains the MCP `2026-07-28` work.
+langchain4j-cdi is not declared here: `vidocq-runtime-langchain4j-cdi-mcp-extension` brings
+`langchain4j-cdi-mcp-server` and `langchain4j-cdi-mcp-invoker-cdi41` at the version Vidocq pins, the `1.5.0`
+release from Maven Central — the first that carries the MCP `2026-07-28` protocol support (tool annotations,
+resource templates, MRTR) these examples exercise.
 
-Vidocq is pinned the same way (`vidocq.version`) to `0.4.0-SNAPSHOT`: its runtime, annotation processors and
+Vidocq is pinned (`vidocq.version`) to `0.4.0-SNAPSHOT`: its runtime, annotation processors and
 `vidocq-runtime-maven-plugin`. Launched from a flat module path, as an IDE launches it, 0.4.0 moves
 `langchain4j-cdi-mcp-invoker-cdi41` into the Vauban application layer together with the MCP server; 0.3.0 moved
 only the MCP server, and every MCP invocation then failed with a `ClassCastException` on `McpInvokerProvider`
 (see "Running from an IDE"). Move `vidocq.version` to `0.4.0` once Vidocq releases it.
 
-Both snapshots are resolved from `https://central.sonatype.com/repository/maven-snapshots/`, declared in the root
+The Vidocq snapshots are resolved from `https://central.sonatype.com/repository/maven-snapshots/`, declared in the root
 POM with snapshots enabled and releases disabled — once under `<repositories>` for the dependencies and once
 under `<pluginRepositories>`, because Maven resolves `vidocq-runtime-maven-plugin` from plugin repositories only.
 No `settings.xml` change is needed.
@@ -320,7 +319,7 @@ None touch MCP server production code. `mcp-tasks-server` relies on the first an
 2. ~~Three `--add-exports` compiler flags~~ — **not needed.** An earlier measurement against langchain4j-cdi's
    MCP server found that its module descriptor exported only `…server.registry`, so no module-path consumer
    could compile against `…server.api`, `…server.protocol` or `…server.transport` without `--add-exports`.
-   `1.4.0-SNAPSHOT` now exports all three packages, so this module needs none of them.
+   langchain4j-cdi `1.5.0` exports all three packages, so this module needs none of them.
 3. **`run.sh` moves `langchain4j-cdi-mcp-server`, `mcp-server-api` and `langchain4j-cdi-mcp-invoker-cdi41` from
    `lib/` into `app/` before starting the server.** This one is required. `vidocq:package` puts only the
    application jar in `app/`, and the generated `bin/mcp-time-server.sh` starts it from one flat module path

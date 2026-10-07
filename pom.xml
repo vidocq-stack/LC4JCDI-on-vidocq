@@ -32,14 +32,6 @@
         <m2e.apt.activation>jdt_apt</m2e.apt.activation>
 
         <!--
-            langchain4j-cdi-mcp is pinned to this exact SNAPSHOT because it is the first version whose MCP
-            server exports its application-facing packages (…server.api, …server.protocol, …server.transport)
-            and carries the MCP 2026-07-28 (tool annotations, resource templates, MRTR) support that these
-            examples exercise. Move this property to a released version once langchain4j-cdi publishes one that
-            contains the MCP 2026-07-28 work (tracked upstream; no release exists yet as of 2026-09).
-        -->
-        <lc4jcdi.version>1.4.0-SNAPSHOT</lc4jcdi.version>
-        <!--
             Vidocq is pinned to the 0.4.0-SNAPSHOT line, resolved from the snapshots repository declared below. When
             the application is launched from a flat module path, as an IDE does, 0.4.0 moves
             langchain4j-cdi-mcp-invoker-cdi41 into the Vauban application layer together with the MCP server; 0.3.0
@@ -58,9 +50,9 @@
     </properties>
 
     <!--
-        One snapshots repository, declared twice: Maven resolves dependencies from <repositories> (langchain4j-cdi
-        1.4.0-SNAPSHOT, the Vidocq 0.4.0-SNAPSHOT jars) but build plugins, such as vidocq-runtime-maven-plugin
-        0.4.0-SNAPSHOT, only from <pluginRepositories>.
+        One snapshots repository, declared twice: Maven resolves dependencies from <repositories> (the Vidocq
+        0.4.0-SNAPSHOT jars) but build plugins, such as vidocq-runtime-maven-plugin 0.4.0-SNAPSHOT, only from
+        <pluginRepositories>.
     -->
     <repositories>
         <repository>

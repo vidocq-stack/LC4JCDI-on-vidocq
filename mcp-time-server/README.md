@@ -25,8 +25,8 @@ mvn -B clean verify -pl mcp-time-server -am
 (cd mcp-time-server && ./run.sh)        # or run the server yourself: http://localhost:8080/mcp
 ```
 
-See the [root README](../README.md) for prerequisites, the snapshot dependencies (langchain4j-cdi
-`1.4.0-SNAPSHOT`, Vidocq `0.4.0-SNAPSHOT`), and the Vidocq host-level workarounds this module relies on
+See the [root README](../README.md) for prerequisites, the snapshot dependencies (Vidocq
+`0.4.0-SNAPSHOT`, which brings langchain4j-cdi `1.5.0`), and the Vidocq host-level workarounds this module relies on
 (`-Avauban.validation=false` and `run.sh`'s jar re-layering).
 
 ## Running from an IDE
