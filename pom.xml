@@ -64,6 +64,28 @@
     -->
     <repositories>
         <repository>
+            <id>vidocq-snapshots</id>
+            <name>Vidocq Snapshots</name>
+            <url>https://maven.vidocq.dev/snapshots/</url>
+            <releases>
+                <enabled>false</enabled>
+            </releases>
+            <snapshots>
+                <enabled>true</enabled>
+            </snapshots>
+        </repository>
+        <repository>
+            <id>vidocq-snapshots-bak</id>
+            <name>Vidocq Snapshots (mirror)</name>
+            <url>https://maven.bak.vidocq.dev/snapshots/</url>
+            <releases>
+                <enabled>false</enabled>
+            </releases>
+            <snapshots>
+                <enabled>true</enabled>
+            </snapshots>
+        </repository>
+        <repository>
             <id>central-snapshots</id>
             <name>Central Portal Snapshots</name>
             <url>https://central.sonatype.com/repository/maven-snapshots/</url>
@@ -76,6 +98,28 @@
         </repository>
     </repositories>
     <pluginRepositories>
+        <pluginRepository>
+            <id>vidocq-snapshots</id>
+            <name>Vidocq Snapshots</name>
+            <url>https://maven.vidocq.dev/snapshots/</url>
+            <releases>
+                <enabled>false</enabled>
+            </releases>
+            <snapshots>
+                <enabled>true</enabled>
+            </snapshots>
+        </pluginRepository>
+        <pluginRepository>
+            <id>vidocq-snapshots-bak</id>
+            <name>Vidocq Snapshots (mirror)</name>
+            <url>https://maven.bak.vidocq.dev/snapshots/</url>
+            <releases>
+                <enabled>false</enabled>
+            </releases>
+            <snapshots>
+                <enabled>true</enabled>
+            </snapshots>
+        </pluginRepository>
         <pluginRepository>
             <id>central-snapshots</id>
             <name>Central Portal Snapshots</name>
